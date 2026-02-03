@@ -1,0 +1,119 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+
+model User{
+  id              String              @id @default(uuid())
+  email           String              @unique
+  username        String              @unique
+  password        String
+  fullName        String?             @map("full_name")
+  isActive        Boolean             @map("is_active")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @default(now()) @map("updated_at")
+
+  wallet          UserWallet?
+  ledger          Ledger[]
+  deposits        Deposit[]
+  @@index([email])
+  @@index([username])
+  @@map("user")
+}
+
+model UserWallet{
+  userId          String              @id @map("user_id")
+  walletIndex     BigInt              @unique @map("wallet_index")
+  address         String              @unique
+
+  createdAt       DateTime            @default(now()) @map("created_at")
+   
+  user            User                @relation( fields: [userId] , references: [id] , onDelete:Cascade)
+
+  @@index([address])
+  @@map("user_wallets")
+}
+
+// User Balanc Per asset
+model Ledger{
+  userId        String          @map("user_id")
+  asset         String
+  available     Decimal        @default(0) @db.Decimal(20, 8)
+  reserved      Decimal        @default(0) @db.Decimal(20, 8)
+
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @default(now()) @map("updated_at")
+
+   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@id([userId, asset])
+    @@index([userId])
+    @@map("ledger")
+}
+
+model LedgerChange {
+  id              String         @id @default(uuid())
+  userId          String         @map("user_id")
+  asset           String
+  changeType      ChangeType     @map("change_type")
+  amount          Decimal        @db.Decimal(20, 8)
+  balanceBefore   Decimal        @map("balance_before") @db.Decimal(20, 8)
+  balanceAfter    Decimal        @map("balance_after") @db.Decimal(20, 8)
+  referenceId     String?        @map("reference_id") // tx_hash for deposits
+  referenceType   String?        @map("reference_type") // "DEPOSIT", "WITHDRAWAL", etc.
+  metadata        String?        @db.Text // JSON string for additional data
+  createdAt       DateTime       @default(now()) @map("created_at")
+  
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([referenceId])
+  @@map("ledger_changes")
+}
+
+enum ChangeType{
+  DEPOSIT
+  WITHDRAWAL
+  RESERVE
+  RELEASE
+  TRADE_BUY
+  TRADE_SELL
+}
+
+
+model Deposit{
+  id              String          @id @default(uuid())
+  userId          String          @map("user_id")
+  asset           String
+  amount          Decimal         @db.Decimal(20,8)
+  txHash          String          @map("tx_hash")
+  fromAddress     String          @map("from_address")
+  toAddress       String          @map("to_address")
+  status          DepositeStatus  @default(PENDING)
+  blockTime       DateTime         @map("block_time")
+  confirmedAt     DateTime?      @map("confirmed_at")
+  createdAt       DateTime        @default(now()) @map("updated_at")
+
+
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([txHash])
+  @@index([status])
+  @@map("deposits")
+}
+
+enum DepositeStatus{
+  PENDING
+  CONFIRMED
+  FAILED 
+}
