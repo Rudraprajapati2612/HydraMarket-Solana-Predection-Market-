@@ -1,0 +1,66 @@
+syntax = "proto3"
+
+package user;
+
+
+service UserService{
+
+}
+
+message RegisterRequest{
+    string email = 1;
+    string username = 2;
+    string password = 3;
+    string fullname = 4;
+}
+
+message RegisterResponse{
+    string  user_id = 1;
+    string email = 2;
+    string username = 3;
+    string wallet_address = 4;
+    string token = 5;
+}
+
+message  LoginRequest{
+    string  email = 1;
+    string password = 2;
+}
+
+message LoginResponse{
+    string user_id = 1;
+    string email = 2;
+    string username = 3;
+    string wallet_address = 4;
+    string token = 5;
+}
+
+
+message ValidateTokenRequest{
+    string token = 1;
+}
+
+mssage ValidateTokenResponse{
+     bool valid = 1;
+     string user_id = 2;
+     string email = 3;
+     string username = 4;
+}
+
+
+message GetUserRequest {
+  string user_id = 1;
+}
+
+message GetUserByUsernameRequest {
+  string username = 1;
+}
+
+message GetUserResponse {
+  string user_id = 1;
+  string email = 2;
+  string username = 3;
+  string full_name = 4;
+  string wallet_address = 5;
+  string created_at = 6;
+}
