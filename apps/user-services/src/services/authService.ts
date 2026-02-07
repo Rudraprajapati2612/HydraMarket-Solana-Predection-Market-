@@ -17,7 +17,7 @@ export class AuthServices {
     email: string;
     password: string;
     username: string;
-    fullname?: string;
+    fullName?: string;
   }) {
     const existingEmail = await prisma.user.findUnique({
       where: {
@@ -46,21 +46,29 @@ export class AuthServices {
           email: data.email,
           password: hassedPassword,
           username: data.username,
-          fullName: data.fullname,
+          fullName: data.fullName,
         },
       });
-      const walletIndex = await this.getNextWalletIndex();
+     
 
-      // Derive Wallet Address
-      const address = this.walletManager.deriveAddress(walletIndex);
+      
 
       const wallet = await tx.userWallet.create({
         data: {
           userId: user.id,
-          walletIndex,
-          address,
+          address:'',
         },
       });
+
+      const address = this.walletManager.deriveAddress(Number(wallet.walletIndex));
+
+      const updatedWallet = await tx.userWallet.update({
+        where: { userId: user.id },
+        data: { address },
+      });
+
+      // Derive Wallet Address
+      
 
       await tx.ledger.create({
         data: {
@@ -71,7 +79,7 @@ export class AuthServices {
         },
       });
 
-      return { user, wallet };
+      return { user, updatedWallet };
     });
 
     const token = this.generateToken({
@@ -91,13 +99,13 @@ export class AuthServices {
     console.log(
       `User registered: ${result.user.username} (${result.user.email})`
     );
-    console.log(`   Wallet: ${result.wallet.address}`);
+    console.log(`   Wallet: ${result.updatedWallet.address}`);
 
     return {
       userId: result.user.id,
       email: result.user.email,
       username: result.user.username,
-      walletAddress: result.wallet.address,
+      walletAddress: result.updatedWallet.address,
       token,
     };
   }
@@ -210,21 +218,21 @@ export class AuthServices {
     });
   }
 
-  private async getNextWalletIndex(): Promise<number> {
-    const result = await prisma.$queryRaw<{ nextval: bigint }[]>`
-          SELECT nextval('wallet_index_seq')
-        `;
+  // private async getNextWalletIndex(): Promise<number> {
+  //   const result = await prisma.$queryRaw<{ nextval: bigint }[]>`
+  //         SELECT nextval('wallet_index_seq')
+  //       `;
 
-    if (
-      !result ||
-      result.length === 0 ||
-      typeof result[0]?.nextval === "undefined"
-    ) {
-      throw new Error("Failed to retrieve next wallet index from database");
-    }
+  //   if (
+  //     !result ||
+  //     result.length === 0 ||
+  //     typeof result[0]?.nextval === "undefined"
+  //   ) {
+  //     throw new Error("Failed to retrieve next wallet index from database");
+  //   }
 
-    return Number(result[0].nextval);
-  }
+  //   return Number(result[0].nextval);
+  // }
 
   async getUserById(userId: string) {
     const cached = await redis.get(`user:${userId}`);

@@ -2,9 +2,10 @@ import {Elysia,t} from "elysia";
 import { userServiceAPi } from "../grpc/userClient";
 import { AppError } from "../types";
 import { authPlugin } from "../plugins/auth";
+import { error } from "console";
 
 export const authRoutes = new Elysia({prefix : '/auth'})
-    .use(authPlugin)
+    .use(authPlugin())
     // post auth/register  
     .post('/register',async({body})=>{
         try{
@@ -12,7 +13,7 @@ export const authRoutes = new Elysia({prefix : '/auth'})
                 email : body.email,
                 username : body.username,
                 password : body.password,
-                full_name : body.fullName
+                fullName : body.fullName
             })
 
             return {
@@ -25,17 +26,24 @@ export const authRoutes = new Elysia({prefix : '/auth'})
                     token: response.token,
                 },
             };
-        }catch(error:any) {
-            if (error.code === 6) { // ALREADY_EXISTS
-                throw new AppError(
-                  error.details || 'User already exists',
-                  409,
-                  'USER_EXISTS'
-                );
-        }
-
-        throw new AppError('Registration failed', 500);
-    }
+        }catch (error: any) {
+            console.error('Register gRPC error:', error);
+          
+            if (error.code === 6) {
+              throw new AppError(
+                error.details || 'User already exists',
+                409,
+                'USER_EXISTS'
+              );
+            }
+          
+            throw new AppError(
+              error.details || 'Registration failed',
+              500,
+              'REGISTER_FAILED'
+            );
+          }
+          
     },{
         body: t.Object({
             email : t.String({
@@ -109,9 +117,10 @@ export const authRoutes = new Elysia({prefix : '/auth'})
 
     //  auth/me (middleware) = Protected 
 
-    .get('/me',async({user})=>{
-        if(!user){
-            throw new AppError('Unauthorized',401,'UNAUTHORIZED');
+    .get('/me', async ({user}) => {
+        
+        if (!user) {
+            throw new AppError('Unauthorized', 401, 'UNAUTHORIZED');
         }
 
         try{
@@ -125,19 +134,29 @@ export const authRoutes = new Elysia({prefix : '/auth'})
                     username: userData.username,
                     fullName: userData.full_name,
                     walletAddress: userData.wallet_address,
-                    kycStatus: userData.kyc_status,
+                    
                     createdAt: userData.created_at,
                 },
             };
-        }catch(e:any){
-            if (e.code === 5) { // NOT_FOUND
-                throw new AppError('User not found', 404, 'USER_NOT_FOUND');
+        }catch (e: any) {
+            console.error('GetUser failed', {
+              message: e?.message,
+              code: e?.code,
+              stack: e?.stack,
+            });
+          
+            if (e?.code === 5) {
+              throw new AppError(e.message, 404, 'USER_NOT_FOUND');
             }
-              
-            throw new AppError('Failed to fetch user', 500);
-        }
+          
+            throw e instanceof AppError
+              ? e
+              : new AppError(e.message || 'Failed to fetch user', 500);
+          }
+          
     },{
         isAuthenticated: true,
+        rateLimit: { max: 5, window: 60 },
     detail: {
       summary: 'Get current user',
       tags: ['Authentication'],

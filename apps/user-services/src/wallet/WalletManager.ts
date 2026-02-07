@@ -1,60 +1,99 @@
-import "dotenv/config"
-import * as bip39 from 'bip39';
+import "dotenv/config";
+import {
+  mnemonicToSeedSync,
+  mnemonicToEntropy,
+} from "@scure/bip39";
+import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { derivePath } from "ed25519-hd-key";
 import { Keypair, PublicKey } from "@solana/web3.js";
-export class WalletManager{
-    private masterSeed : Buffer;
-    private mnemonic : string
 
-    constructor(mnemonic?:string){
-        if(!process.env.MASTER_MNEMONIC){
-            throw new Error("MASTER MENOMIC is missing ")
-        }
-        this.mnemonic = mnemonic || process.env.MASTER_MNEMONIC
+function normalizeMnemonic(m: string): string {
+  return m
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
-        if(!this.mnemonic){
-            throw new Error("MASTER MENOMIC is not found in env  ")
-        }
+export class WalletManager {
+  private masterSeed: Buffer;
+  private mnemonic: string;
 
-        if(!bip39.validateMnemonic(this.mnemonic)){
-            throw new Error("Invalid Menomic Key")
-        }
-        //  Convert seed to a mnemonic 
-        this.masterSeed = bip39.mnemonicToSeedSync(this.mnemonic);
-        console.log(' WalletManager initialized');
-        console.log('  MASTER MNEMONIC (KEEP SECURE):');
-        console.log(this.mnemonic);
+  constructor(mnemonic?: string) {
+    const envMnemonic = process.env.MASTER_MNEMONIC;
+
+    if (!mnemonic && !envMnemonic) {
+      throw new Error("MASTER_MNEMONIC is missing");
     }
 
-    deriveKeypair(walletIndex:number){
-        const path = `m/44'/501'/0'/0'/${walletIndex}`;
-        const deriveSeed = derivePath(path,this.masterSeed.toString('hex')).key;
+    this.mnemonic = normalizeMnemonic(mnemonic || envMnemonic!);
 
-        return Keypair.fromSeed(deriveSeed)
+    // ✅ Validate mnemonic
+    try {
+      mnemonicToEntropy(this.mnemonic, wordlist);
+      console.log("✅ Mnemonic validated successfully");
+    } catch (err) {
+      console.error("❌ Invalid mnemonic phrase");
+      throw new Error("Invalid Mnemonic");
     }
 
-    derivePublicKey(walletIndex: number): PublicKey {
-        const keypair = this.deriveKeypair(walletIndex);
-        const publicKey = keypair.publicKey;
-        
-        // Clear keypair from memory
-        keypair.secretKey.fill(0);
-        
-        return publicKey;
-      }
+    // ✅ Derive master seed
+    this.masterSeed = Buffer.from(
+      mnemonicToSeedSync(this.mnemonic, "", 
+        // @ts-ignore
+        wordlist)
+    );
 
-    deriveAddress(walletIndex:number){
-        return this.derivePublicKey(walletIndex).toBase58();
-    }
+    console.log("✅ WalletManager initialized");
+  }
 
-    //  For future use 
-    // verifySignature(
-    //     walletIndex: number,
-    //     message: Uint8Array,
-    //     signature: Uint8Array
-    //   ): boolean {
-    //     const publicKey = this.derivePublicKey(walletIndex);
-    //     // Implement signature verification
-    //     return true; // Placeholder
-    //   }
+  /**
+   * Derive a Solana keypair at a specific index
+   * Uses standard Solana derivation path: m/44'/501'/{index}'/0'
+   */
+  deriveKeypair(walletIndex: number): Keypair {
+    const path = `m/44'/501'/${walletIndex}'/0'`;
+
+    const derivedSeed = derivePath(
+      path,
+      this.masterSeed.toString("hex")
+    ).key;
+
+    return Keypair.fromSeed(derivedSeed);
+  }
+
+  /**
+   * Derive public key at a specific index
+   */
+  derivePublicKey(walletIndex: number): PublicKey {
+    const keypair = this.deriveKeypair(walletIndex);
+    const pubkey = keypair.publicKey;
+    
+    // Security: Clear the secret key from memory
+    keypair.secretKey.fill(0);
+    
+    return pubkey;
+  }
+
+  /**
+   * Derive wallet address (Base58 string) at a specific index
+   */
+  deriveAddress(walletIndex: number): string {
+    return this.derivePublicKey(walletIndex).toBase58();
+  }
+
+  /**
+   * Derive multiple addresses at once
+   */
+  deriveAddresses(count: number, startIndex: number = 0): string[] {
+    return Array.from({ length: count }, (_, i) => 
+      this.deriveAddress(startIndex + i)
+    );
+  }
+
+  /**
+   * Get the mnemonic phrase (use with caution!)
+   */
+  getMnemonic(): string {
+    return this.mnemonic;
+  }
 }

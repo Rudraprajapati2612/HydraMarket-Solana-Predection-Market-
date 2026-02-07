@@ -21,7 +21,10 @@ export const rateLimitPlugins = new Elysia({name : 'rateLimit'})
 
        .macro(({onBeforeHandle})=>({
             rateLimit(config:RateLimitConfig){
-                onBeforeHandle(async({clientIp,path})=>{
+                onBeforeHandle(async({ 
+                // @ts-ignore
+                    clientIp,path
+                })=>{
                     const key = `rateLimit:${clientIp}:${path}`;
 
                     const current = await redis.get(key);
@@ -41,7 +44,7 @@ export const rateLimitPlugins = new Elysia({name : 'rateLimit'})
                     if(!current){
                         pipeline.expire(key, config.window);
                     }
-                    
+                    // Send Whole batch in one network round Trip 
                     await pipeline.exec();
                 
                 })

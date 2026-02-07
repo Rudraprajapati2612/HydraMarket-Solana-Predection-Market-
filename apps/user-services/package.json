@@ -6,6 +6,9 @@
   "devDependencies": {
     "@types/bun": "latest"
   },
+  "scripts": {
+    "dev": "bun run --watch src/index.ts"
+  },
   "peerDependencies": {
     "typescript": "^5",
     "db": "*"
@@ -13,6 +16,8 @@
   "dependencies": {
     "@grpc/grpc-js": "^1.14.3",
     "@grpc/proto-loader": "^0.8.0",
+    "@scure/bip32": "^2.0.1",
+    "@scure/bip39": "^2.0.1",
     "@solana/web3.js": "^1.98.4",
     "@types/bcryptjs": "^3.0.0",
     "@types/express": "^5.0.6",

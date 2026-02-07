@@ -1,17 +1,24 @@
-syntax = "proto3"
+syntax = "proto3";
 
 package user;
 
 
 service UserService{
-
+      
+      rpc Register(RegisterRequest) returns (RegisterResponse);
+      rpc Login(LoginRequest) returns (LoginResponse);
+      rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);
+      
+      // User Info
+      rpc GetUser(GetUserRequest) returns (GetUserResponse);
+      rpc GetUserByUsername(GetUserByUsernameRequest) returns (GetUserResponse);
 }
 
 message RegisterRequest{
     string email = 1;
     string username = 2;
     string password = 3;
-    string fullname = 4;
+    string fullName = 4;
 }
 
 message RegisterResponse{
@@ -34,13 +41,13 @@ message LoginResponse{
     string wallet_address = 4;
     string token = 5;
 }
-
+  
 
 message ValidateTokenRequest{
     string token = 1;
 }
 
-mssage ValidateTokenResponse{
+message ValidateTokenResponse{
      bool valid = 1;
      string user_id = 2;
      string email = 3;

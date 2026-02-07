@@ -34,7 +34,7 @@ model User{
 
 model UserWallet{
   userId          String              @id @map("user_id")
-  walletIndex     BigInt              @unique @map("wallet_index")
+  walletIndex     BigInt              @unique @default(autoincrement()) @map("wallet_index")
   address         String              @unique
 
   createdAt       DateTime            @default(now()) @map("created_at")
@@ -98,10 +98,10 @@ model Deposit{
   txHash          String          @map("tx_hash")
   fromAddress     String          @map("from_address")
   toAddress       String          @map("to_address")
-  status          DepositeStatus  @default(PENDING)
+  status          DepositStatus  @default(PENDING)
   blockTime       DateTime         @map("block_time")
   confirmedAt     DateTime?      @map("confirmed_at")
-  createdAt       DateTime        @default(now()) @map("updated_at")
+  createdAt       DateTime        @default(now()) @map("created_at")
 
 
   user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -112,7 +112,7 @@ model Deposit{
   @@map("deposits")
 }
 
-enum DepositeStatus{
+enum DepositStatus{
   PENDING
   CONFIRMED
   FAILED 

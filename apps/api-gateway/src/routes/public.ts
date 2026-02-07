@@ -5,7 +5,7 @@ import { AppError } from "../types";
 import { catchall } from "zod/mini";
 
 
-const publicRoutes = new Elysia()
+export const publicRoutes = new Elysia()
     
         .get('/user/:username',async({params})=>{
             try{
