@@ -1,0 +1,145 @@
+import {Elysia,t} from "elysia";
+import { userServiceAPi } from "../grpc/userClient";
+import { AppError } from "../types";
+import { authPlugin } from "../plugins/auth";
+
+export const authRoutes = new Elysia({prefix : '/auth'})
+    .use(authPlugin)
+    // post auth/register  
+    .post('/register',async({body})=>{
+        try{
+            const response = await userServiceAPi.register({
+                email : body.email,
+                username : body.username,
+                password : body.password,
+                full_name : body.fullName
+            })
+
+            return {
+                success : true,
+                data:{
+                    userId : response.user_id,
+                    email: response.email,
+                    username: response.username,
+                    walletAddress: response.wallet_address,
+                    token: response.token,
+                },
+            };
+        }catch(error:any) {
+            if (error.code === 6) { // ALREADY_EXISTS
+                throw new AppError(
+                  error.details || 'User already exists',
+                  409,
+                  'USER_EXISTS'
+                );
+        }
+
+        throw new AppError('Registration failed', 500);
+    }
+    },{
+        body: t.Object({
+            email : t.String({
+                format : 'email',
+                error : 'Invalid Email address'
+            }),
+            username : t.String({
+                minLength : 3,
+                maxLength : 20,
+                pattern: '^[a-z0-9_]+$',
+                error: 'Username must be 3-20 characters, lowercase alphanumeric and underscores only',
+            }),
+            password : t.String({
+                minLength : 8,
+                pattern: '.*[0-9].*',
+                error: 'Password must be at least 8 characters and contain at least one number',
+            }),
+
+            fullName: t.Optional(
+                t.String({
+                    minLength: 2,
+                    maxLength: 100
+                })
+            ),
+            
+           
+        }),
+        detail: {
+            summary: 'Register new user',
+            tags: ['Authentication'],
+        },
+    })
+
+    // post auth/login 
+
+    .post('login',async({body})=>{
+        try{
+            const response = await userServiceAPi.login({
+                email : body.email,
+                password : body.password
+            });
+
+            return {
+                success : true,
+                data:{
+                    userId : response.user_id,
+                    email : response.email,
+                    username : response.username,
+                    walletAddress : response.wallet_address,
+                    token:response.token
+                },
+            };
+        }catch(error:any){
+            if (error.code === 16) { // UNAUTHENTICATED
+                throw new AppError('Invalid credentials', 401, 'INVALID_CREDENTIALS');
+              }
+              
+              throw new AppError('Login failed', 500);
+        }
+    },{
+        body : t.Object({
+            email : t.String({format : 'email'}),
+            password : t.String({minLength:8}),
+        }),
+        detail: {
+            summary: 'Login user',
+            tags: ['Authentication'],
+        },
+    })
+
+
+    //  auth/me (middleware) = Protected 
+
+    .get('/me',async({user})=>{
+        if(!user){
+            throw new AppError('Unauthorized',401,'UNAUTHORIZED');
+        }
+
+        try{
+            const userData = await userServiceAPi.GetUser(user.userId);
+
+            return{
+                success : true,
+                data:{
+                    userId: userData.user_id,
+                    email: userData.email,
+                    username: userData.username,
+                    fullName: userData.full_name,
+                    walletAddress: userData.wallet_address,
+                    kycStatus: userData.kyc_status,
+                    createdAt: userData.created_at,
+                },
+            };
+        }catch(e:any){
+            if (e.code === 5) { // NOT_FOUND
+                throw new AppError('User not found', 404, 'USER_NOT_FOUND');
+            }
+              
+            throw new AppError('Failed to fetch user', 500);
+        }
+    },{
+        isAuthenticated: true,
+    detail: {
+      summary: 'Get current user',
+      tags: ['Authentication'],
+    },
+    })
