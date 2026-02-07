@@ -15,7 +15,7 @@ export const authPlugin = () => {
       )
       .use(bearer())
       .derive(async ({ jwt, bearer }) => {
-        console.log("Bearer token:", bearer);
+        // console.log("Bearer token:", bearer);
         if (!bearer) return { user: null };
 
         try {

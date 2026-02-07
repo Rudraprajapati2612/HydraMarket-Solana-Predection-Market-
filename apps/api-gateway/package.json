@@ -4,7 +4,8 @@
   "type": "module",
   "private": true,
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "autocannon": "^8.0.0"
   },
   "scripts": {
     "dev": "bun run --watch src/index.ts"
