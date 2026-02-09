@@ -13,6 +13,9 @@
     "typescript": "^5",
     "db": "*"
   },
+  "exports":{
+    "./utils": "./src/utils/memoGenerator.ts"
+  },
   "dependencies": {
     "@grpc/grpc-js": "^1.14.3",
     "@grpc/proto-loader": "^0.8.0",

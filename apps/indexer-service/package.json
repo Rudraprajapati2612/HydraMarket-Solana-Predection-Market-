@@ -1,0 +1,22 @@
+{
+  "name": "indexer-service",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "scripts": {
+    "dev": "bun run --watch src/index.ts"
+  },
+  "peerDependencies": {
+    "typescript": "^5",
+    "db": "*"
+  },
+  "dependencies": {
+    "@solana/web3.js": "^1.98.4",
+    "dotenv": "^17.2.4",
+    "ioredis": "^5.9.2",
+    "user-services": "*"
+  }
+}

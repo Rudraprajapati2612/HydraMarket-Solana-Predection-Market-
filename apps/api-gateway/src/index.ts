@@ -5,6 +5,7 @@ import { authPlugin } from "./plugins/auth";
 import { authRoutes } from './routes/auth';
 import { publicRoutes } from "./routes/public";
 import { AppError } from './types';
+import { balanceRoute } from "./routes/balance";
 
 const PORT = parseInt(process.env.PORT || '3000');
 
@@ -43,7 +44,7 @@ const app = new Elysia()
 
   .use(authRoutes)
   .use(publicRoutes)
-
+  .use(balanceRoute)
   .onError(({ code, error, set }) => {
     console.error('Error:', error);
 
