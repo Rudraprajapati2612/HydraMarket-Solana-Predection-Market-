@@ -43,13 +43,13 @@ const USER_SERVICE_URL = process.env.USER_SERVICE_GRPC || 'localhost:50051';
       email: string;
       username: string;
       password: string;
-      fullName?: string; // ✅ camelCase
+      fullName?: string; 
     }) =>
       grpcCall<any>('Register', {
         email: data.email,
         username: data.username,
         password: data.password,
-        fullName: data.fullName, // ✅ matches proto
+        fullName: data.fullName, 
       }),
   
     login: (data: { email: string; password: string }) =>

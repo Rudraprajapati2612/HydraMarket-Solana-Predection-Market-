@@ -13,36 +13,43 @@ datasource db {
   provider = "postgresql"
 }
 
-
+ 
 model User{
   id              String              @id @default(uuid())
   email           String              @unique
   username        String              @unique
   password        String
   fullName        String?             @map("full_name")
+  depositeMemo    String              @unique @map("deposie_memo")
   isActive        Boolean             @default(true) @map("is_active")
   createdAt       DateTime            @default(now()) @map("created_at")
   updatedAt       DateTime            @default(now()) @map("updated_at")
 
-  wallet          UserWallet?
   ledger          Ledger[]
   deposits        Deposit[]
+  withdrawals     Withdrawal[]
   @@index([email])
   @@index([username])
+  @@index([depositeMemo])
   @@map("user")
 }
 
-model UserWallet{
-  userId          String              @id @map("user_id")
-  walletIndex     BigInt              @unique @default(autoincrement()) @map("wallet_index")
-  address         String              @unique
+model PlatformWallet{
+  id             String               @id @default(uuid())
+  walletType     WalletType           @map("wallet_type")
+  address        String               @unique
+  name           String               // hot wallet or cold wallet 
+  purpose        String     
+  isActive       Boolean              @default(true) @map("is_active")
+  createdAt      DateTime             @default(now()) @map("created_at")
 
-  createdAt       DateTime            @default(now()) @map("created_at")
-   
-  user            User                @relation( fields: [userId] , references: [id] , onDelete:Cascade)
+  @@index([walletType])
+  @@map("platform_wallets")
+}
 
-  @@index([address])
-  @@map("user_wallets")
+enum WalletType{
+  HOT
+  COLD
 }
 
 // User Balanc Per asset
@@ -95,11 +102,12 @@ model Deposit{
   userId          String          @map("user_id")
   asset           String
   amount          Decimal         @db.Decimal(20,8)
-  txHash          String          @map("tx_hash")
-  fromAddress     String          @map("from_address")
+  txHash          String          @unique @map("tx_hash")
+  memo            String?
+  fromAddress     String?          @map("from_address")
   toAddress       String          @map("to_address")
   status          DepositStatus  @default(PENDING)
-  blockTime       DateTime         @map("block_time")
+  blockTime       DateTime?         @map("block_time")
   confirmedAt     DateTime?      @map("confirmed_at")
   createdAt       DateTime        @default(now()) @map("created_at")
 
@@ -109,6 +117,7 @@ model Deposit{
   @@index([userId, createdAt(sort: Desc)])
   @@index([txHash])
   @@index([status])
+  @@index([memo])
   @@map("deposits")
 }
 
@@ -116,4 +125,31 @@ enum DepositStatus{
   PENDING
   CONFIRMED
   FAILED 
+}
+
+
+model Withdrawal{
+  id              String          @id   @default(uuid())
+  userId          String          @map("user_id")
+  asset           String
+  amount          Decimal         @db.Decimal(20,8)
+  destinationAddress String       @map("destination_address")
+  txHash          String?         @unique @map("tx_hash")
+  status          WithdrawalStatus    @default(PENDING)
+  requestedAt     DateTime        @default(now())  @map("requested_at")
+  processedAt     DateTime        @map("processed_at")
+  failureReason   String?         @map("failure_reason")
+
+  user            User            @relation(fields: [userId],references: [id],onDelete: Cascade)
+
+  @@index([userId, requestedAt(sort: Desc)])
+  @@index([status])
+  @@map("withdrawals")
+}
+
+enum WithdrawalStatus {
+  PENDING
+  PROCESSING
+  CONFIRMED
+  FAILED
 }

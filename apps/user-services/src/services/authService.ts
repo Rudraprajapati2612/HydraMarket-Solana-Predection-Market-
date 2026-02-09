@@ -2,17 +2,15 @@ import bcrypt from "bcryptjs";
 import { prisma } from "db/client";
 import jwt from "jsonwebtoken";
 import { redis } from "../redis";
-import { WalletManager } from "../wallet/WalletManager";
+import { generateDepositMemo } from "../utils/memoGenerator";
+
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
+const HOT_WALLET_ADDRESS = process.env.HOT_WALLET_ADDRESS! ;
+
 export class AuthServices {
-  private walletManager: WalletManager;
-
-  constructor() {
-    this.walletManager = new WalletManager();
-  }
-
+  
   async register(data: {
     email: string;
     password: string;
@@ -39,73 +37,71 @@ export class AuthServices {
     }
 
     const hassedPassword = await bcrypt.hash(data.password, 10);
+    // create a unique deposite memo
+    let depositeMemo = generateDepositMemo();
 
-    const result = await prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({
+    // Check memo is unique 
+
+    let attempts = 0;
+
+    while(await prisma.user.findUnique({where:{depositeMemo}}) ){
+      if(attempts++>10){
+        throw new Error("Failed to Generate unique memo")
+      }
+      depositeMemo = generateDepositMemo();
+    }
+
+    console.log(`📝 Generated deposit memo: ${depositeMemo}`);
+
+    const user = await prisma.$transaction(async (tx) => {
+      const newUser = await tx.user.create({
         data: {
           email: data.email,
           password: hassedPassword,
           username: data.username,
           fullName: data.fullName,
+          depositeMemo 
         },
       });
      
-
       
-
-      const wallet = await tx.userWallet.create({
-        data: {
-          userId: user.id,
-          address:'',
-        },
-      });
-
-      const address = this.walletManager.deriveAddress(Number(wallet.walletIndex));
-
-      const updatedWallet = await tx.userWallet.update({
-        where: { userId: user.id },
-        data: { address },
-      });
-
-      // Derive Wallet Address
-      
-
       await tx.ledger.create({
         data: {
-          userId: user.id,
+          userId: newUser.id,
           asset: "USDC",
           available: 0,
           reserved: 0,
         },
       });
 
-      return { user, updatedWallet };
+      return  newUser;
     });
 
     const token = this.generateToken({
-      userId: result.user.id,
-      email: result.user.email,
-      username: result.user.username,
+      userId: user.id,
+      email: user.email,
+      username: user.username,
     });
 
     
     // 6. Cache session in Redis
     await this.cacheSession(token, {
-      userId: result.user.id,
-      email: result.user.email,
-      username: result.user.username,
+      userId: user.id,
+      email: user.email,
+      username: user.username,
     });
 
     console.log(
-      `User registered: ${result.user.username} (${result.user.email})`
+      `User registered: ${user.username} (${user.email})`
     );
-    console.log(`   Wallet: ${result.updatedWallet.address}`);
-
+    console.log(`   Deposit Address: ${HOT_WALLET_ADDRESS}`);
+    console.log(`   Deposit Memo: ${user.depositeMemo}`);
+    
     return {
-      userId: result.user.id,
-      email: result.user.email,
-      username: result.user.username,
-      walletAddress: result.updatedWallet.address,
+      userId: user.id,
+      email: user.email,
+      username: user.username,
+      depositeMemo : user.depositeMemo,
       token,
     };
   }
@@ -114,9 +110,6 @@ export class AuthServices {
     const user = await prisma.user.findUnique({
       where: {
         email: data.email,
-      },
-      include: {
-        wallet: true,
       },
     });
 
@@ -151,7 +144,8 @@ export class AuthServices {
       userId: user.id,
       email: user.email,
       username: user.username,
-      walletAddress: user.wallet?.address,
+      depositAddress: HOT_WALLET_ADDRESS,
+      depositeMemo: user.depositeMemo,
       token,
     };
   }
@@ -218,21 +212,7 @@ export class AuthServices {
     });
   }
 
-  // private async getNextWalletIndex(): Promise<number> {
-  //   const result = await prisma.$queryRaw<{ nextval: bigint }[]>`
-  //         SELECT nextval('wallet_index_seq')
-  //       `;
-
-  //   if (
-  //     !result ||
-  //     result.length === 0 ||
-  //     typeof result[0]?.nextval === "undefined"
-  //   ) {
-  //     throw new Error("Failed to retrieve next wallet index from database");
-  //   }
-
-  //   return Number(result[0].nextval);
-  // }
+ 
 
   async getUserById(userId: string) {
     const cached = await redis.get(`user:${userId}`);
@@ -245,9 +225,7 @@ export class AuthServices {
       where: {
         id: userId,
       },
-      include: {
-        wallet: true,
-      },
+     
     });
 
     if (!user) {
@@ -259,7 +237,8 @@ export class AuthServices {
       email: user.email,
       username: user.username,
       fullName: user.fullName,
-      walletAddress: user.wallet?.address,
+      depositeAddress:HOT_WALLET_ADDRESS,
+      depositeMemo : user.depositeMemo,
       createdAt: user.createdAt.toISOString(),
     };
 
@@ -272,7 +251,6 @@ export class AuthServices {
   async getUserByUsername(username: string) {
     const user = await prisma.user.findUnique({
       where: { username },
-      include: { wallet: true },
     });
 
     if (!user) {
@@ -284,7 +262,8 @@ export class AuthServices {
       email: user.email,
       username: user.username,
       fullName: user.fullName,
-      walletAddress: user.wallet?.address,
+      depositeAddress:HOT_WALLET_ADDRESS,
+      depositeMemo : user.depositeMemo,
       createdAt: user.createdAt.toISOString(),
     };
   }

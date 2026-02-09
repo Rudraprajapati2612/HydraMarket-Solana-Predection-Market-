@@ -45,7 +45,8 @@ const userServiceImpl = {
                 user_id : result.userId,
                 email : result.email,
                 username : result.username,
-                wallet_address : result.walletAddress,
+                
+                deposite_memo:result.depositeMemo,
                 token : result.token
             });
         }catch(e:any){
@@ -69,7 +70,8 @@ const userServiceImpl = {
             user_id: result.userId,
             email: result.email,
             username: result.username,
-            wallet_address: result.walletAddress,
+            deposite_address:result.depositAddress,
+            deposite_memo : result.depositeMemo,
             token: result.token,
           });
         } catch (error: any) {
@@ -112,8 +114,8 @@ const userServiceImpl = {
             email: user.email,
             username: user.username,
             full_name: user.fullName || '',
-            wallet_address: user.walletAddress || '',
-            kyc_status: user.kycStatus,
+            deposit_address: user.depositAddress,
+            deposite_memo: user.depositeMemo,
             created_at: user.createdAt,
           });
         } catch (error: any) {
@@ -134,7 +136,8 @@ const userServiceImpl = {
             email: user.email,
             username: user.username,
             full_name: user.fullName || '',
-            wallet_address: user.walletAddress || '',
+            deposite_address : user.depositeAddress,
+            deposite_memo: user.depositeMemo,
             created_at: user.createdAt,
           });
         } catch (error: any) {

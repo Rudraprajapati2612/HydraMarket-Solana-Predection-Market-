@@ -25,8 +25,9 @@ message RegisterResponse{
     string  user_id = 1;
     string email = 2;
     string username = 3;
-    string wallet_address = 4;
-    string token = 5;
+    string deposite_address =4;
+    string deposite_memo = 5; 
+    string token = 6;
 }
 
 message  LoginRequest{
@@ -35,11 +36,12 @@ message  LoginRequest{
 }
 
 message LoginResponse{
-    string user_id = 1;
+    string  user_id = 1;
     string email = 2;
     string username = 3;
-    string wallet_address = 4;
-    string token = 5;
+    string deposite_address =4;
+    string deposite_memo = 5; 
+    string token = 6;
 }
   
 
@@ -48,10 +50,10 @@ message ValidateTokenRequest{
 }
 
 message ValidateTokenResponse{
-     bool valid = 1;
-     string user_id = 2;
-     string email = 3;
-     string username = 4;
+     
+     string user_id = 1;
+     string email = 2;
+     string username = 3;
 }
 
 
@@ -68,6 +70,8 @@ message GetUserResponse {
   string email = 2;
   string username = 3;
   string full_name = 4;
-  string wallet_address = 5;
-  string created_at = 6;
+  string deposite_address = 5;
+  string deposite_memo =6;
+  bool is_active = 7;
+  string created_at = 8;
 }

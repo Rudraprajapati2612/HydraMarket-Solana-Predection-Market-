@@ -2,7 +2,6 @@ import Elysia from "elysia";
 import cors from "@elysiajs/cors";
 import swagger from "@elysiajs/swagger";
 import { authPlugin } from "./plugins/auth";
-// import { rateLimitPlugins } from "./plugins/rateLimit"; // ❌ REMOVE THIS
 import { authRoutes } from './routes/auth';
 import { publicRoutes } from "./routes/public";
 import { AppError } from './types';
@@ -28,8 +27,6 @@ const app = new Elysia()
       ]
     }
   }))
-
-  // .use(rateLimitPlugins) // ❌ REMOVE THIS LINE
   .use(authPlugin())
 
   .get('/health', () => ({

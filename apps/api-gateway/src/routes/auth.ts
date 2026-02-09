@@ -23,7 +23,7 @@ export const authRoutes = new Elysia({ prefix: '/auth' })
           userId: response.user_id,
           email: response.email,
           username: response.username,
-          walletAddress: response.wallet_address,
+          depositememo : response.deposite_memo,
           token: response.token,
         },
       };
@@ -110,9 +110,9 @@ export const authRoutes = new Elysia({ prefix: '/auth' })
     },
   })
 
-  // GET /auth/me (RATE LIMITED) ✅
+  // GET /auth/me (RATE LIMITED) 
   .get('/me', async ({ user, request,server }) => {
-    // ✅ Check rate limit using the request object directly
+    // Check rate limit using the request object directly
     await checkRateLimit(request, 5, 60,server);
 
     if (!user) {
