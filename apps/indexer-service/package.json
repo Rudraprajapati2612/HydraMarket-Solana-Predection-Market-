@@ -7,15 +7,20 @@
     "@types/bun": "latest"
   },
   "scripts": {
-    "dev": "bun run --watch src/index.ts"
+    "dev": "bun run --watch src/index.ts",
+    "xyz": "bun run test/test-deposit.ts",
+    "manual": "bun run test/manual.ts"
   },
   "peerDependencies": {
     "typescript": "^5",
     "db": "*"
   },
   "dependencies": {
+    "@solana/spl-token": "^0.4.14",
     "@solana/web3.js": "^1.98.4",
+    "bs58": "^6.0.0",
     "dotenv": "^17.2.4",
+    "elysia": "^1.4.23",
     "ioredis": "^5.9.2",
     "user-services": "*"
   }
