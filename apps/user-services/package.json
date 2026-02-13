@@ -14,7 +14,8 @@
     "db": "*"
   },
   "exports":{
-    "./utils": "./src/utils/memoGenerator.ts"
+    "./utils": "./src/utils/memoGenerator.ts",
+    "./balance":"./src/services/BalanceService.ts"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.14.3",

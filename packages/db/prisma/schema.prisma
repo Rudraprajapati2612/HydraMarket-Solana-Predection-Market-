@@ -137,7 +137,7 @@ model Withdrawal{
   txHash          String?         @unique @map("tx_hash")
   status          WithdrawalStatus    @default(PENDING)
   requestedAt     DateTime        @default(now())  @map("requested_at")
-  processedAt     DateTime        @map("processed_at")
+  processedAt     DateTime?        @map("processed_at")
   failureReason   String?         @map("failure_reason")
 
   user            User            @relation(fields: [userId],references: [id],onDelete: Cascade)
