@@ -1,0 +1,1426 @@
+{
+  "address": "HiXBiQDjtvMCW4K6xsgyCrEf7zH1zkWuAtGqshSSfJL9",
+  "metadata": {
+    "name": "resolution_adapter",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "HydraMarket Resolution Adapter"
+  },
+  "instructions": [
+    {
+      "name": "dispute_proposal",
+      "docs": [
+        "Dispute an existing proposal"
+      ],
+      "discriminator": [
+        243,
+        93,
+        145,
+        52,
+        145,
+        32,
+        171,
+        103
+      ],
+      "accounts": [
+        {
+          "name": "disputer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "resolution_proposal",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  115,
+                  111,
+                  108,
+                  117,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "resolution_proposal.market",
+                "account": "ResolutionProposal"
+              }
+            ]
+          }
+        },
+        {
+          "name": "bond_vault",
+          "writable": true
+        },
+        {
+          "name": "dispute_bonder_account",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "counter_outcome",
+          "type": {
+            "defined": {
+              "name": "ResultOutcome"
+            }
+          }
+        },
+        {
+          "name": "reason",
+          "type": "string"
+        },
+        {
+          "name": "bond_amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "emergency_resolve",
+      "docs": [
+        "Emergency resolution (admin only)"
+      ],
+      "discriminator": [
+        63,
+        112,
+        185,
+        42,
+        47,
+        61,
+        232,
+        79
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "docs": [
+            "Admin/multi-sig authority"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "market",
+          "docs": [
+            "Market account (from MarketRegistry)"
+          ]
+        },
+        {
+          "name": "market_registry_program",
+          "docs": [
+            "Market Registry program"
+          ],
+          "address": "H42DouiugXCKGn9sHrC7N6PtvRQFwwDLZsHJW1Q58N2h"
+        },
+        {
+          "name": "resolution_proposal",
+          "docs": [
+            "Resolution proposal PDA"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  115,
+                  111,
+                  108,
+                  117,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "bond_vault",
+          "docs": [
+            "Bond vault (holds all bonds)"
+          ],
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "forced_outcome",
+          "type": {
+            "defined": {
+              "name": "ResultOutcome"
+            }
+          }
+        },
+        {
+          "name": "reason",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "finalize_outcome",
+      "docs": [
+        "Finalize outcome after dispute window"
+      ],
+      "discriminator": [
+        122,
+        242,
+        226,
+        81,
+        187,
+        211,
+        79,
+        179
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "reward_authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "market",
+          "writable": true
+        },
+        {
+          "name": "market_registery_program",
+          "address": "H42DouiugXCKGn9sHrC7N6PtvRQFwwDLZsHJW1Q58N2h"
+        },
+        {
+          "name": "resolution_proposal",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  115,
+                  111,
+                  108,
+                  117,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "bond_vault",
+          "writable": true
+        },
+        {
+          "name": "winner_account",
+          "docs": [
+            "Winner's USDC account (receives bond + reward)"
+          ],
+          "writable": true
+        },
+        {
+          "name": "protocol_treasury",
+          "docs": [
+            "Protocol treasury (source of rewards)"
+          ],
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "final_outcome",
+          "type": {
+            "defined": {
+              "name": "ResultOutcome"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "initialize_resolution",
+      "docs": [
+        "Initialize resolution proposal account for a market"
+      ],
+      "discriminator": [
+        114,
+        234,
+        73,
+        65,
+        38,
+        194,
+        180,
+        145
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "market",
+          "docs": [
+            "CHECK : validate via seeds"
+          ]
+        },
+        {
+          "name": "resolution_proposal",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  115,
+                  111,
+                  108,
+                  117,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "bond_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  110,
+                  100,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "bond_mint",
+          "docs": [
+            "CHECK : validation by constraint"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "category",
+          "type": {
+            "defined": {
+              "name": "MarketCategory"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "propose_crypto_outcome",
+      "docs": [
+        "Propose outcome for crypto market using price oracles"
+      ],
+      "discriminator": [
+        112,
+        219,
+        31,
+        226,
+        70,
+        101,
+        48,
+        154
+      ],
+      "accounts": [
+        {
+          "name": "proposer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "market"
+        },
+        {
+          "name": "market_registry_program",
+          "address": "H42DouiugXCKGn9sHrC7N6PtvRQFwwDLZsHJW1Q58N2h"
+        },
+        {
+          "name": "resolution_proposal",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  115,
+                  111,
+                  108,
+                  117,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "bond_vault",
+          "writable": true
+        },
+        {
+          "name": "proposer_bond_account",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "pair",
+          "type": "string"
+        },
+        {
+          "name": "condition",
+          "type": {
+            "defined": {
+              "name": "PriceCondition"
+            }
+          }
+        },
+        {
+          "name": "feed_ids",
+          "type": {
+            "vec": "string"
+          }
+        },
+        {
+          "name": "bond_amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "propose_sports_outcome",
+      "docs": [
+        "Propose outcome for sports market using event data"
+      ],
+      "discriminator": [
+        243,
+        83,
+        51,
+        236,
+        42,
+        219,
+        179,
+        60
+      ],
+      "accounts": [
+        {
+          "name": "proposer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "market"
+        },
+        {
+          "name": "market_registery_program",
+          "address": "H42DouiugXCKGn9sHrC7N6PtvRQFwwDLZsHJW1Q58N2h"
+        },
+        {
+          "name": "resolution_proposal",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  115,
+                  111,
+                  108,
+                  117,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "bond_vault",
+          "writable": true
+        },
+        {
+          "name": "proposer_bond_account",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "event_id",
+          "type": "string"
+        },
+        {
+          "name": "event_type",
+          "type": {
+            "defined": {
+              "name": "SportsEventType"
+            }
+          }
+        },
+        {
+          "name": "oracle_data",
+          "type": {
+            "vec": {
+              "defined": {
+                "name": "SportsOracleData"
+              }
+            }
+          }
+        },
+        {
+          "name": "bond_amount",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "ResolutionProposal",
+      "discriminator": [
+        188,
+        203,
+        94,
+        223,
+        208,
+        121,
+        225,
+        38
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "CryptoPriceValidated",
+      "discriminator": [
+        18,
+        224,
+        82,
+        177,
+        106,
+        5,
+        211,
+        120
+      ]
+    },
+    {
+      "name": "EmergencyResolution",
+      "discriminator": [
+        34,
+        20,
+        172,
+        199,
+        129,
+        249,
+        162,
+        199
+      ]
+    },
+    {
+      "name": "OutcomeFinalized",
+      "discriminator": [
+        54,
+        198,
+        29,
+        175,
+        20,
+        68,
+        238,
+        233
+      ]
+    },
+    {
+      "name": "ProposalDispute",
+      "discriminator": [
+        154,
+        44,
+        52,
+        232,
+        238,
+        161,
+        183,
+        61
+      ]
+    },
+    {
+      "name": "ProposalSumbitted",
+      "discriminator": [
+        74,
+        17,
+        3,
+        117,
+        100,
+        131,
+        64,
+        87
+      ]
+    },
+    {
+      "name": "SportsEventvalidated",
+      "discriminator": [
+        145,
+        133,
+        177,
+        175,
+        178,
+        93,
+        41,
+        65
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "MarketNotExpired",
+      "msg": "Market has not expired yet"
+    },
+    {
+      "code": 6001,
+      "name": "MarketNotOpen",
+      "msg": "Market is not in OPEN state"
+    },
+    {
+      "code": 6002,
+      "name": "InsufficientBond",
+      "msg": "Proposal bond is below minimum required"
+    },
+    {
+      "code": 6003,
+      "name": "DisputeWindowOpen",
+      "msg": "Dispute window has not closed yet"
+    },
+    {
+      "code": 6004,
+      "name": "DisputeWindowClosed",
+      "msg": "Dispute window has already closed"
+    },
+    {
+      "code": 6005,
+      "name": "ProposalAlreadyExists",
+      "msg": "Resolution proposal already exists"
+    },
+    {
+      "code": 6006,
+      "name": "NoActiveProposal",
+      "msg": "No active proposal found"
+    },
+    {
+      "code": 6007,
+      "name": "AlreadyFinalized",
+      "msg": "Already finalized"
+    },
+    {
+      "code": 6008,
+      "name": "Unauthorized",
+      "msg": "Caller is not authorized"
+    },
+    {
+      "code": 6009,
+      "name": "InvalidOutcome",
+      "msg": "Invalid outcome provided"
+    },
+    {
+      "code": 6010,
+      "name": "TooManyDataSources",
+      "msg": "Too many data sources (max 5)"
+    },
+    {
+      "code": 6011,
+      "name": "NoDataSources",
+      "msg": "No data sources provided"
+    },
+    {
+      "code": 6012,
+      "name": "StaleOracleData",
+      "msg": "Oracle data is too stale"
+    },
+    {
+      "code": 6013,
+      "name": "PriceDeviationTooHigh",
+      "msg": "Price feeds do not agree (deviation too high)"
+    },
+    {
+      "code": 6014,
+      "name": "LowPriceConfidence",
+      "msg": "Pyth price confidence too low"
+    },
+    {
+      "code": 6015,
+      "name": "InvalidPythAccount",
+      "msg": "Invalid Pyth price account"
+    },
+    {
+      "code": 6016,
+      "name": "InvalidSwitchboardAccount",
+      "msg": "Invalid Switchboard aggregator"
+    },
+    {
+      "code": 6017,
+      "name": "ArithmeticOverflow",
+      "msg": "Arithmetic overflow"
+    },
+    {
+      "code": 6018,
+      "name": "ArithmeticUnderflow",
+      "msg": "Arithmetic underflow"
+    },
+    {
+      "code": 6019,
+      "name": "InvalidMarketCategory",
+      "msg": "Invalid market category for this oracle type"
+    },
+    {
+      "code": 6020,
+      "name": "PriceConditionNotMet",
+      "msg": "Price condition not met"
+    },
+    {
+      "code": 6021,
+      "name": "InvalidEventOutcome",
+      "msg": "Event outcome does not match any valid option"
+    },
+    {
+      "code": 6022,
+      "name": "DataSourceDisagreement",
+      "msg": "Multiple data sources disagree on outcome"
+    },
+    {
+      "code": 6023,
+      "name": "CannotDisputeOwnProposal",
+      "msg": "Cannot dispute own proposal"
+    },
+    {
+      "code": 6024,
+      "name": "InsufficientDisputeBond",
+      "msg": "Dispute bond must be equal or greater than original bond"
+    },
+    {
+      "code": 6025,
+      "name": "MaxDisputesReached",
+      "msg": "Maximum disputes reached"
+    },
+    {
+      "code": 6026,
+      "name": "InvalidTimestamp",
+      "msg": "Invalid timestamp"
+    },
+    {
+      "code": 6027,
+      "name": "MarketRegistryMismatch",
+      "msg": "Market registry mismatch"
+    },
+    {
+      "code": 6028,
+      "name": "BondVaultMismatch",
+      "msg": "Bond vault mismatch"
+    },
+    {
+      "code": 6029,
+      "name": "InvalidAccountCount",
+      "msg": "Invalid account count"
+    },
+    {
+      "code": 6030,
+      "name": "UnauthorizedAdmin",
+      "msg": "Unauthorized admin"
+    }
+  ],
+  "types": [
+    {
+      "name": "BondContributor",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "participant",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CryptoPriceValidated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "pair",
+            "type": "string"
+          },
+          {
+            "name": "oracle_type",
+            "type": {
+              "defined": {
+                "name": "OracleType"
+              }
+            }
+          },
+          {
+            "name": "price",
+            "type": "i64"
+          },
+          {
+            "name": "confidence",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DataSource",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "source_type",
+            "type": {
+              "defined": {
+                "name": "OracleType"
+              }
+            }
+          },
+          {
+            "name": "identifer",
+            "type": "string"
+          },
+          {
+            "name": "oracle_account",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "value",
+            "type": {
+              "defined": {
+                "name": "OracleValue"
+              }
+            }
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DisputeProposal",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "disputer",
+            "type": "pubkey"
+          },
+          {
+            "name": "counter_outcome",
+            "type": {
+              "defined": {
+                "name": "ResultOutcome"
+              }
+            }
+          },
+          {
+            "name": "bond_amount",
+            "type": "u64"
+          },
+          {
+            "name": "reason",
+            "type": "string"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EmergencyResolution",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "outcome",
+            "type": {
+              "defined": {
+                "name": "ResultOutcome"
+              }
+            }
+          },
+          {
+            "name": "reason",
+            "type": "string"
+          },
+          {
+            "name": "refunded_amount",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MarketCategory",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Crypto"
+          },
+          {
+            "name": "Sports"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OracleType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Pyth"
+          },
+          {
+            "name": "Switchboard"
+          },
+          {
+            "name": "Api3"
+          },
+          {
+            "name": "RapidApi"
+          },
+          {
+            "name": "Manual"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OracleValue",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Price",
+            "fields": [
+              "i64"
+            ]
+          },
+          {
+            "name": "Event",
+            "fields": [
+              "string"
+            ]
+          },
+          {
+            "name": "Boolean",
+            "fields": [
+              "bool"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "OutcomeFinalized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "outcome",
+            "type": {
+              "defined": {
+                "name": "ResultOutcome"
+              }
+            }
+          },
+          {
+            "name": "winning_proposer",
+            "type": "pubkey"
+          },
+          {
+            "name": "was_disputed",
+            "type": "bool"
+          },
+          {
+            "name": "slashed_amount",
+            "type": "u64"
+          },
+          {
+            "name": "reward_amount",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PriceCondition",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "GreaterOrEqual",
+            "fields": [
+              {
+                "name": "target",
+                "type": "i64"
+              }
+            ]
+          },
+          {
+            "name": "LessOrEqual",
+            "fields": [
+              {
+                "name": "target",
+                "type": "i64"
+              }
+            ]
+          },
+          {
+            "name": "Between",
+            "fields": [
+              {
+                "name": "min",
+                "type": "i64"
+              },
+              {
+                "name": "max",
+                "type": "i64"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProposalDispute",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposer",
+            "type": "pubkey"
+          },
+          {
+            "name": "disputer",
+            "type": "pubkey"
+          },
+          {
+            "name": "counter_outcome",
+            "type": {
+              "defined": {
+                "name": "ResultOutcome"
+              }
+            }
+          },
+          {
+            "name": "bond_amount",
+            "type": "u64"
+          },
+          {
+            "name": "reason",
+            "type": "string"
+          },
+          {
+            "name": "new_deadline",
+            "type": "i64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProposalSumbitted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposer",
+            "type": "pubkey"
+          },
+          {
+            "name": "outcome",
+            "type": {
+              "defined": {
+                "name": "ResultOutcome"
+              }
+            }
+          },
+          {
+            "name": "category",
+            "type": {
+              "defined": {
+                "name": "MarketCategory"
+              }
+            }
+          },
+          {
+            "name": "bond_amount",
+            "type": "u64"
+          },
+          {
+            "name": "data_source_count",
+            "type": "u8"
+          },
+          {
+            "name": "dispute_deadline",
+            "type": "i64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ResolutionProposal",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposer",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposed_outcome",
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "ResultOutcome"
+                }
+              }
+            }
+          },
+          {
+            "name": "bond_amount",
+            "type": "u64"
+          },
+          {
+            "name": "proposal_timestamp",
+            "type": "i64"
+          },
+          {
+            "name": "dispute_deadline",
+            "type": "i64"
+          },
+          {
+            "name": "category",
+            "type": {
+              "defined": {
+                "name": "MarketCategory"
+              }
+            }
+          },
+          {
+            "name": "data_source",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "DataSource"
+                }
+              }
+            }
+          },
+          {
+            "name": "is_disputed",
+            "type": "bool"
+          },
+          {
+            "name": "is_finalized",
+            "type": "bool"
+          },
+          {
+            "name": "disputes",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "DisputeProposal"
+                }
+              }
+            }
+          },
+          {
+            "name": "bond_vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "bond_contributors",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "BondContributor"
+                }
+              }
+            }
+          },
+          {
+            "name": "is_emergency_resolved",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ResultOutcome",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Yes"
+          },
+          {
+            "name": "No"
+          },
+          {
+            "name": "Invalid"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SportsEventType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Winner"
+          },
+          {
+            "name": "ScoreThreshold"
+          },
+          {
+            "name": "YesNo"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SportsEventvalidated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "event_id",
+            "type": "string"
+          },
+          {
+            "name": "oracle_type",
+            "type": {
+              "defined": {
+                "name": "OracleType"
+              }
+            }
+          },
+          {
+            "name": "result",
+            "type": "string"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SportsOracleData",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "source_type",
+            "type": {
+              "defined": {
+                "name": "OracleType"
+              }
+            }
+          },
+          {
+            "name": "source_name",
+            "type": "string"
+          },
+          {
+            "name": "oracle_account",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "result",
+            "type": "string"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    }
+  ]
+}

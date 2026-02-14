@@ -6,6 +6,8 @@ import { authRoutes } from './routes/auth';
 import { publicRoutes } from "./routes/public";
 import { AppError } from './types';
 import { balanceRoute } from "./routes/balance";
+import { depositeRoute } from "./routes/deposite";
+import  { withdrawalRoute } from "./routes/withdrawals";
 
 const PORT = parseInt(process.env.PORT || '3000');
 
@@ -45,6 +47,8 @@ const app = new Elysia()
   .use(authRoutes)
   .use(publicRoutes)
   .use(balanceRoute)
+  .use(depositeRoute)
+  .use(withdrawalRoute)
   .onError(({ code, error, set }) => {
     console.error('Error:', error);
 

@@ -28,6 +28,9 @@ model User{
   ledger          Ledger[]
   deposits        Deposit[]
   withdrawals     Withdrawal[]
+  marketCreated   Market[]
+  orders            Order[]
+  positions         Position[]
   @@index([email])
   @@index([username])
   @@index([depositeMemo])
@@ -148,6 +151,143 @@ model Withdrawal{
 }
 
 enum WithdrawalStatus {
+  PENDING
+  PROCESSING
+  CONFIRMED
+  FAILED
+}
+
+
+model Market{
+  id                String         @id @default(uuid())
+  marketId          String         @unique @map("market_id")
+  question          String  
+  description       String
+  category          String
+  creatorId         String         @map("creator_id")
+  creator           User           @relation(fields: [creatorId],references: [id])
+
+  marketPda         String        @map("market_pda")
+  escrowVaultPda    String        @map("escrow_vault_pda")
+  yesTokenMint      String        @map("yes_token_mint")
+  noTokenMint       String        @map("no_token_mint")
+
+  state             MarketState   @default(CLOSE)
+  outcome           MarketOutcome?
+
+  createdAt         DateTime          @default(now()) @map("created_at")
+  expiresAt         DateTime          @map("expires_at")
+  resolvedAt        DateTime?         @map("resolved_at")
+  
+  orders            Order[]
+  positions         Position[]
+  @@map("markets")
+}
+
+enum MarketState{
+  OPEN
+  CLOSE
+  CREATED
+  RESOLVED
+  RESOLVING
+  PAUSED
+}
+
+enum MarketOutcome {
+  YES
+  NO
+  INVALID
+}
+
+
+model Order{
+  id                  String                      @id @default(uuid())
+  userId              String                      @map("user_id")
+  user                User                        @relation(fields: [userId],references: [id])
+  marketId            String                      @map("market_id")
+  market              Market                      @relation(fields: [marketId],references: [id])
+
+  side              OrderSide         // BUY_YES, BUY_NO, SELL_YES, SELL_NO
+  amount            Decimal           @db.Decimal(20, 6) // USDC amount
+  price             Decimal           @db.Decimal(5, 4)  // 0.0000 - 1.0000
+  quantity          Decimal           @db.Decimal(20, 6) // Token quantity
+  
+  status            OrderStatus       @default(PENDING)
+  filledQuantity    Decimal           @default(0) @map("filled_quantity") @db.Decimal(20, 6)
+  
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+  
+  @@index([userId])
+  @@index([marketId])
+  @@index([status])
+  @@map("orders")
+
+}
+
+enum OrderSide {
+  BUY_YES
+  BUY_NO
+  SELL_YES
+  SELL_NO
+}
+
+enum OrderStatus {
+  PENDING
+  PARTIAL
+  FILLED
+  CANCELLED
+  FAILED
+}
+
+model Position{
+  id                 String             @id @default(uuid())
+  userId             String             @map("user_id")
+  user               User               @relation(fields: [userId],references: [id])
+  marketId           String             @map("market_id")
+  market             Market             @relation(references: [marketId],fields: [id])
+  
+  yesTokens         Decimal             @default(0) @map("yes_tokens") @db.Decimal(20, 6)
+  noTokens          Decimal             @default(0) @map("no_tokens") @db.Decimal(20, 6)
+  avgYesPrice       Decimal?            @map("avg_yes_price") @db.Decimal(5, 4)
+  avgNoPrice        Decimal?            @map("avg_no_price") @db.Decimal(5, 4)
+
+
+  yesTokenAccount   String?             @map("yes_token_account")
+  noTokenAccount    String?             @map("no_token_account")
+
+  isClaimed         Boolean             @default(false) @map("is_claimed")
+  claimedAt         DateTime?           @map("claimed_at")
+  claimTxHash       String?             @map("claim_tx_hash")
+
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+  
+  @@unique([userId, marketId])
+  @@index([userId])
+  @@index([marketId])
+  @@map("positions")
+}
+
+model MintTransaction {
+  id                String                @id @default(uuid())
+  marketId          String                @map("user_id")
+  yesRecipientId    String                @map("yes_recipient_id")
+  noRecipientId     String                @map("no_recipient_id")
+  pairs             Int
+  collateralAmount  Decimal               @map("collateral_amount") @db.Decimal(20,6)
+  txHash            String                @unique  @map("tx_hash")
+  status            TransactionStatus     @default(PENDING)
+
+  createdAt         DateTime          @default(now()) @map("created_at")
+  confirmedAt       DateTime?         @map("confirmed_at")
+  
+  @@index([marketId])
+  @@index([status])
+  @@map("mint_transactions")
+}
+
+enum TransactionStatus {
   PENDING
   PROCESSING
   CONFIRMED

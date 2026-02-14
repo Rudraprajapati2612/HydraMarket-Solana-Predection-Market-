@@ -1,0 +1,1136 @@
+{
+  "address": "CRyAfXPmf11myj8X1dZ3AdjSfwXEjB5Ep4HpXmf6D6QP",
+  "metadata": {
+    "name": "escrow_vault",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "HydraMarket Escrow Vault"
+  },
+  "instructions": [
+    {
+      "name": "claim_payout",
+      "discriminator": [
+        127,
+        240,
+        132,
+        62,
+        227,
+        198,
+        146,
+        133
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault.market",
+                "account": "EscrowVault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market"
+        },
+        {
+          "name": "usdc_vault",
+          "writable": true
+        },
+        {
+          "name": "user_usdc",
+          "writable": true
+        },
+        {
+          "name": "yes_token_mint",
+          "writable": true
+        },
+        {
+          "name": "no_token_mint",
+          "writable": true
+        },
+        {
+          "name": "user_yes_account",
+          "writable": true
+        },
+        {
+          "name": "user_no_account",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_vault",
+      "discriminator": [
+        48,
+        191,
+        163,
+        44,
+        71,
+        129,
+        63,
+        164
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "market",
+          "docs": [
+            "Market account from MarketRegistry (for validation)"
+          ]
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "usdc_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "usdc_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "usdc_mint"
+        },
+        {
+          "name": "yes_token_mint"
+        },
+        {
+          "name": "no_token_mint"
+        },
+        {
+          "name": "market_registery_program",
+          "docs": [
+            "Market registry program (for CPI validation)"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "mint_pairs",
+      "discriminator": [
+        63,
+        216,
+        104,
+        77,
+        215,
+        189,
+        83,
+        81
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault.market",
+                "account": "EscrowVault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market"
+        },
+        {
+          "name": "market_registry_program",
+          "address": "H42DouiugXCKGn9sHrC7N6PtvRQFwwDLZsHJW1Q58N2h"
+        },
+        {
+          "name": "usdc_vault",
+          "writable": true
+        },
+        {
+          "name": "usdc_mint"
+        },
+        {
+          "name": "hot_wallet_usdc",
+          "writable": true
+        },
+        {
+          "name": "yes_token_mint",
+          "writable": true
+        },
+        {
+          "name": "no_token_mint",
+          "writable": true
+        },
+        {
+          "name": "yes_recipient",
+          "writable": true
+        },
+        {
+          "name": "no_recipient",
+          "docs": [
+            "NO token recipient account (user who buys NO)"
+          ],
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "pairs",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "pause_minting",
+      "discriminator": [
+        15,
+        247,
+        181,
+        3,
+        81,
+        145,
+        229,
+        68
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault.market",
+                "account": "EscrowVault"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "resume_minting",
+      "discriminator": [
+        85,
+        46,
+        64,
+        227,
+        250,
+        67,
+        42,
+        157
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault.market",
+                "account": "EscrowVault"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "settle",
+      "discriminator": [
+        175,
+        42,
+        185,
+        87,
+        144,
+        131,
+        102,
+        212
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault.market",
+                "account": "EscrowVault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market"
+        },
+        {
+          "name": "market_registry_program",
+          "address": "H42DouiugXCKGn9sHrC7N6PtvRQFwwDLZsHJW1Q58N2h"
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "EscrowVault",
+      "discriminator": [
+        54,
+        84,
+        41,
+        149,
+        160,
+        181,
+        85,
+        114
+      ]
+    },
+    {
+      "name": "Market",
+      "discriminator": [
+        219,
+        190,
+        213,
+        55,
+        0,
+        227,
+        198,
+        154
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "MintingPaused",
+      "discriminator": [
+        46,
+        27,
+        29,
+        35,
+        231,
+        194,
+        1,
+        191
+      ]
+    },
+    {
+      "name": "MintingResumed",
+      "discriminator": [
+        25,
+        135,
+        109,
+        11,
+        28,
+        217,
+        34,
+        247
+      ]
+    },
+    {
+      "name": "PairsMinted",
+      "discriminator": [
+        108,
+        154,
+        184,
+        215,
+        50,
+        138,
+        35,
+        141
+      ]
+    },
+    {
+      "name": "PayoutClaimed",
+      "discriminator": [
+        200,
+        39,
+        105,
+        112,
+        116,
+        63,
+        58,
+        149
+      ]
+    },
+    {
+      "name": "SettlementInitialized",
+      "discriminator": [
+        81,
+        142,
+        61,
+        128,
+        50,
+        41,
+        79,
+        189
+      ]
+    },
+    {
+      "name": "VaultInitialized",
+      "discriminator": [
+        180,
+        43,
+        207,
+        2,
+        18,
+        71,
+        3,
+        75
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "Unauthorized",
+      "msg": "Unauthorized: Only admin can perform this action"
+    },
+    {
+      "code": 6001,
+      "name": "MarketNotOpen",
+      "msg": "Market is not in OPEN state"
+    },
+    {
+      "code": 6002,
+      "name": "MarketNotResolved",
+      "msg": "Market has not been resolved yet"
+    },
+    {
+      "code": 6003,
+      "name": "AlreadySettled",
+      "msg": "Market has already been settled"
+    },
+    {
+      "code": 6004,
+      "name": "NotSettled",
+      "msg": "Vault has not been settled yet"
+    },
+    {
+      "code": 6005,
+      "name": "InsufficientCollateral",
+      "msg": "Insufficient collateral provided"
+    },
+    {
+      "code": 6006,
+      "name": "CollateralNotReceived",
+      "msg": "Collateral verification failed - vault balance did not increase"
+    },
+    {
+      "code": 6007,
+      "name": "InvalidPairCount",
+      "msg": "Invalid number of pairs (must be > 0)"
+    },
+    {
+      "code": 6008,
+      "name": "InvalidVaultState",
+      "msg": "balance After Transfer is less than before"
+    },
+    {
+      "code": 6009,
+      "name": "ArithmeticOverflow",
+      "msg": "Arithmetic overflow occurred"
+    },
+    {
+      "code": 6010,
+      "name": "ArithmeticUnderflow",
+      "msg": "Arithmetic underflow occurred"
+    },
+    {
+      "code": 6011,
+      "name": "InvariantViolationSupplyMismatch",
+      "msg": "CRITICAL: Invariant violation - YES supply != NO supply"
+    },
+    {
+      "code": 6012,
+      "name": "InvariantViolationCollateralMismatch",
+      "msg": "CRITICAL: Invariant violation - Supply != Collateral"
+    },
+    {
+      "code": 6013,
+      "name": "InvalidOutcome",
+      "msg": "Invalid market outcome"
+    },
+    {
+      "code": 6014,
+      "name": "NoTokensToClaim",
+      "msg": "User has no tokens to claim"
+    },
+    {
+      "code": 6015,
+      "name": "InvalidRecipientAccount",
+      "msg": "Invalid recipient token account"
+    },
+    {
+      "code": 6016,
+      "name": "PayoutCalculationFailed",
+      "msg": "Payout calculation failed"
+    },
+    {
+      "code": 6017,
+      "name": "TokenBurnFailed",
+      "msg": "Token burn failed"
+    },
+    {
+      "code": 6018,
+      "name": "TokenTransferFailed",
+      "msg": "Token transfer failed"
+    },
+    {
+      "code": 6019,
+      "name": "MintingPaused",
+      "msg": "Minting is currently paused"
+    },
+    {
+      "code": 6020,
+      "name": "MintingNotPaused",
+      "msg": "Minting is not paused"
+    },
+    {
+      "code": 6021,
+      "name": "BatchSizeExceeded",
+      "msg": "Batch size exceeds maximum"
+    },
+    {
+      "code": 6022,
+      "name": "InvalidVaultAuthority",
+      "msg": "Invalid vault authority"
+    },
+    {
+      "code": 6023,
+      "name": "MarketRegistryMismatch",
+      "msg": "Market registry mismatch"
+    },
+    {
+      "code": 6024,
+      "name": "TokenMintMismatch",
+      "msg": "Token mint mismatch"
+    },
+    {
+      "code": 6025,
+      "name": "UsdcVaultMismatch",
+      "msg": "USDC vault mismatch"
+    }
+  ],
+  "types": [
+    {
+      "name": "EscrowVault",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "mrarket_registery_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "usdc_vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "yes_token_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "no_token_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_locked_collateral",
+            "type": "u64"
+          },
+          {
+            "name": "total_yes_minted",
+            "type": "u64"
+          },
+          {
+            "name": "total_no_minted",
+            "type": "u64"
+          },
+          {
+            "name": "is_settled",
+            "type": "bool"
+          },
+          {
+            "name": "is_minting_paused",
+            "type": "bool"
+          },
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Market",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "question",
+            "type": "string"
+          },
+          {
+            "name": "description",
+            "type": "string"
+          },
+          {
+            "name": "category",
+            "type": "string"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "expire_at",
+            "type": "i64"
+          },
+          {
+            "name": "state",
+            "type": {
+              "defined": {
+                "name": "MarketState"
+              }
+            }
+          },
+          {
+            "name": "yes_token_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "no_token_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "escrow_vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "resolution_adapter",
+            "type": "pubkey"
+          },
+          {
+            "name": "resolution_source",
+            "type": "string"
+          },
+          {
+            "name": "resolution_outcome",
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "ResultOutcome"
+                }
+              }
+            }
+          },
+          {
+            "name": "resolved_at",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MarketState",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Open"
+          },
+          {
+            "name": "Close"
+          },
+          {
+            "name": "Created"
+          },
+          {
+            "name": "Resolved"
+          },
+          {
+            "name": "Resolving"
+          },
+          {
+            "name": "Paused"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MintingPaused",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MintingResumed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PairsMinted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "yes_recipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "no_recipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "pairs",
+            "type": "u64"
+          },
+          {
+            "name": "collateral_locked",
+            "type": "u64"
+          },
+          {
+            "name": "total_locked",
+            "type": "u64"
+          },
+          {
+            "name": "total_yes_minted",
+            "type": "u64"
+          },
+          {
+            "name": "total_no_minted",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PayoutClaimed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "payout_amount",
+            "type": "u64"
+          },
+          {
+            "name": "yes_burned",
+            "type": "u64"
+          },
+          {
+            "name": "no_burned",
+            "type": "u64"
+          },
+          {
+            "name": "remaning_collateral",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ResultOutcome",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Yes"
+          },
+          {
+            "name": "No"
+          },
+          {
+            "name": "Invalid"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SettlementInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_collateral",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VaultInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "usdc_vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "yes_token_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "no_token_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -43,7 +43,7 @@ const USDC_MINT = new PublicKey(
     'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr'
 );
 
-const MEMO = 'DEP-378522'; // Your memo
+const MEMO = 'DEP-A42F1A'; // Your memo
 
 // --------------------
 // TEST DEPOSIT
@@ -92,7 +92,7 @@ async function testDeposit() {
             USDC_MINT,                     // mint
             toTokenAccount.address,        // destination
             phantomKeypair.publicKey,      // owner
-            20 * 1_000_000,                // amount (50 USDC)
+            10 * 1_000_000,                // amount (50 USDC)
             6                              // decimals
         )
     );
@@ -100,7 +100,7 @@ async function testDeposit() {
     console.log('\n3️⃣ Sending transaction...');
     console.log('   From:', phantomKeypair.publicKey.toBase58());
     console.log('   To  :', HOT_WALLET.toBase58());
-    console.log('   Amount: 20 USDC');
+    console.log('   Amount: 10 USDC');
     console.log('   Memo  :', MEMO);
 
     const signature = await sendAndConfirmTransaction(
