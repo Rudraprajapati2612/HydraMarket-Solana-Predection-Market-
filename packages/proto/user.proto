@@ -25,9 +25,10 @@ message RegisterResponse{
     string  user_id = 1;
     string email = 2;
     string username = 3;
-    string deposite_address =4;
-    string deposite_memo = 5; 
-    string token = 6;
+    string role = 4;
+    string deposite_address =5;
+    string deposite_memo = 6; 
+    string token = 7;
 }
 
 message  LoginRequest{
@@ -39,9 +40,10 @@ message LoginResponse{
     string  user_id = 1;
     string email = 2;
     string username = 3;
-    string deposite_address =4;
-    string deposite_memo = 5; 
-    string token = 6;
+    string role = 4;
+    string deposite_address =5;
+    string deposite_memo = 6; 
+    string token = 7;
 }
   
 
@@ -54,6 +56,7 @@ message ValidateTokenResponse{
      string user_id = 1;
      string email = 2;
      string username = 3;
+     string role = 4;
 }
 
 

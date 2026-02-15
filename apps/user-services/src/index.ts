@@ -45,7 +45,7 @@ const userServiceImpl = {
                 user_id : result.userId,
                 email : result.email,
                 username : result.username,
-                
+                role : result.role,
                 deposite_memo:result.depositeMemo,
                 token : result.token
             });
@@ -70,6 +70,7 @@ const userServiceImpl = {
             user_id: result.userId,
             email: result.email,
             username: result.username,
+            role : result.role,
             deposite_address:result.depositAddress,
             deposite_memo : result.depositeMemo,
             token: result.token,
@@ -93,6 +94,7 @@ const userServiceImpl = {
             user_id: result.userId || '',
             email: result.email || '',
             username: result.username || '',
+            role : result.role
           });
         } catch (error: any) {
           callback(null, {
@@ -114,6 +116,7 @@ const userServiceImpl = {
             email: user.email,
             username: user.username,
             full_name: user.fullName || '',
+            role : user.role,
             deposit_address: user.depositAddress,
             deposite_memo: user.depositeMemo,
             created_at: user.createdAt,
@@ -136,6 +139,7 @@ const userServiceImpl = {
             email: user.email,
             username: user.username,
             full_name: user.fullName || '',
+            role : user.role,
             deposite_address : user.depositeAddress,
             deposite_memo: user.depositeMemo,
             created_at: user.createdAt,

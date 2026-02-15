@@ -1,8 +1,8 @@
+
 import { Elysia } from "elysia";
 import jwt from "@elysiajs/jwt";
 import bearer from "@elysiajs/bearer";
 import { AppError } from "../types";
-import type { User } from "../types";
 
 export const authPlugin = () => {
   return (app: Elysia) => {
@@ -15,7 +15,6 @@ export const authPlugin = () => {
       )
       .use(bearer())
       .derive(async ({ jwt, bearer }) => {
-        // console.log("Bearer token:", bearer);
         if (!bearer) return { user: null };
 
         try {
@@ -27,6 +26,7 @@ export const authPlugin = () => {
               userId: payload.userId as string,
               email: payload.email as string,
               username: payload.username as string,
+              role: payload.role as string, // ✅ ADD THIS
             },
           };
         } catch (e) {
@@ -37,12 +37,25 @@ export const authPlugin = () => {
       .macro(({ onBeforeHandle }) => ({
         isAuthenticated(enabled: boolean) {
           if (!enabled) return;
-          onBeforeHandle(({ 
-        // @ts-ignore
-            user
-         }) => {
+          onBeforeHandle(({ user }: any) => {
             if (!user) {
               throw new AppError("Unauthorized", 401, "UNAUTHORIZED");
+            }
+          });
+        },
+        // ✅ ADD NEW MACRO FOR ADMIN CHECK
+        isAdmin(enabled: boolean) {
+          if (!enabled) return;
+          onBeforeHandle(({ user }: any) => {
+            if (!user) {
+              throw new AppError("Unauthorized", 401, "UNAUTHORIZED");
+            }
+            if (user.role !== 'ADMIN' && user.role !== 'SUPERADMIN') {
+              throw new AppError(
+                "Forbidden: Admin access required",
+                403,
+                "FORBIDDEN"
+              );
             }
           });
         },

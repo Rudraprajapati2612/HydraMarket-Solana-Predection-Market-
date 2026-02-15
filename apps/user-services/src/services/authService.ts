@@ -18,18 +18,15 @@ export class AuthServices {
     fullName?: string;
   }) {
     const existingEmail = await prisma.user.findUnique({
-      where: {
-        email: data.email,
-      },
+      where: { email: data.email },
     });
 
     if (existingEmail) {
       throw new Error("Email already exist");
     }
+    
     const existingUsername = await prisma.user.findUnique({
-      where: {
-        username: data.username,
-      },
+      where: { username: data.username },
     });
 
     if (existingUsername) {
@@ -37,16 +34,14 @@ export class AuthServices {
     }
 
     const hassedPassword = await bcrypt.hash(data.password, 10);
-    // create a unique deposite memo
+    
+    // Generate unique deposit memo
     let depositeMemo = generateDepositMemo();
-
-    // Check memo is unique 
-
     let attempts = 0;
 
-    while(await prisma.user.findUnique({where:{depositeMemo}}) ){
-      if(attempts++>10){
-        throw new Error("Failed to Generate unique memo")
+    while (await prisma.user.findUnique({ where: { depositeMemo } })) {
+      if (attempts++ > 10) {
+        throw new Error("Failed to Generate unique memo");
       }
       depositeMemo = generateDepositMemo();
     }
@@ -60,11 +55,11 @@ export class AuthServices {
           password: hassedPassword,
           username: data.username,
           fullName: data.fullName,
-          depositeMemo 
+          depositeMemo,
+          role: "USER", // ✅ Default role
         },
       });
-     
-      
+
       await tx.ledger.create({
         data: {
           userId: newUser.id,
@@ -74,47 +69,45 @@ export class AuthServices {
         },
       });
 
-      return  newUser;
+      return newUser;
     });
 
     const token = this.generateToken({
       userId: user.id,
       email: user.email,
       username: user.username,
+      role: user.role, // ✅ Include role in token
     });
 
-    
-    // 6. Cache session in Redis
+    // Cache session with role
     await this.cacheSession(token, {
       userId: user.id,
       email: user.email,
       username: user.username,
+      role: user.role, // ✅ Cache role
     });
 
-    console.log(
-      `User registered: ${user.username} (${user.email})`
-    );
+    console.log(`✅ User registered: ${user.username} (${user.email}) [${user.role}]`);
     console.log(`   Deposit Address: ${HOT_WALLET_ADDRESS}`);
     console.log(`   Deposit Memo: ${user.depositeMemo}`);
-    
+
     return {
       userId: user.id,
       email: user.email,
       username: user.username,
-      depositeMemo : user.depositeMemo,
+      role: user.role, // ✅ Return role
+      depositeMemo: user.depositeMemo,
       token,
     };
   }
 
   async login(data: { email: string; password: string }) {
     const user = await prisma.user.findUnique({
-      where: {
-        email: data.email,
-      },
+      where: { email: data.email },
     });
 
     if (!user) {
-      throw new Error("User Not exist Please Login");
+      throw new Error("User Not exist Please Register");
     }
 
     if (!user.isActive) {
@@ -130,38 +123,41 @@ export class AuthServices {
       userId: user.id,
       email: user.email,
       username: user.username,
+      role: user.role, // ✅ Include role
     });
 
     await this.cacheSession(token, {
       userId: user.id,
       email: user.email,
       username: user.username,
+      role: user.role, // ✅ Cache role
     });
 
-    console.log(`User logged in: ${user.username}`);
+    console.log(`✅ User logged in: ${user.username} [${user.role}]`);
 
     return {
       userId: user.id,
       email: user.email,
       username: user.username,
+      role: user.role, // ✅ Return role
       depositAddress: HOT_WALLET_ADDRESS,
       depositeMemo: user.depositeMemo,
       token,
     };
   }
-  // It stores Token in redis and redis automaticly remove token
-  // from the redis after 7 Days if you not log out
+
   private async cacheSession(
     token: string,
     data: {
       userId: string;
       email: string;
       username: string;
+      role: string; // ✅ Add role
     }
   ) {
     await redis.setex(
       `session:${token}`,
-      7 * 24 * 60 * 60, //7 Days
+      7 * 24 * 60 * 60, // 7 Days
       JSON.stringify(data)
     );
   }
@@ -171,19 +167,22 @@ export class AuthServices {
       const cached = await redis.get(`session:${token}`);
 
       if (cached) {
-        return JSON.parse(cached);
+        const session = JSON.parse(cached);
+        return {
+          valid: true,
+          ...session,
+        };
       }
 
-      //  Verify JWT
-
+      // Verify JWT
       const decoded = jwt.verify(token, JWT_SECRET) as any;
 
-      // Cache For next time
-
+      // Cache for next time
       await this.cacheSession(token, {
         userId: decoded.userId,
         email: decoded.email,
         username: decoded.username,
+        role: decoded.role, // ✅ Cache role
       });
 
       return {
@@ -191,6 +190,7 @@ export class AuthServices {
         userId: decoded.userId,
         email: decoded.email,
         username: decoded.username,
+        role: decoded.role, // ✅ Return role
       };
     } catch (e) {
       return {
@@ -198,6 +198,7 @@ export class AuthServices {
         userId: null,
         email: null,
         username: null,
+        role: null,
       };
     }
   }
@@ -206,13 +207,12 @@ export class AuthServices {
     userId: string;
     email: string;
     username: string;
+    role: string; // ✅ Add role
   }): string {
     return jwt.sign(payload, JWT_SECRET, {
       expiresIn: "7d",
     });
   }
-
- 
 
   async getUserById(userId: string) {
     const cached = await redis.get(`user:${userId}`);
@@ -222,10 +222,7 @@ export class AuthServices {
     }
 
     const user = await prisma.user.findUnique({
-      where: {
-        id: userId,
-      },
-     
+      where: { id: userId },
     });
 
     if (!user) {
@@ -237,8 +234,9 @@ export class AuthServices {
       email: user.email,
       username: user.username,
       fullName: user.fullName,
-      depositeAddress:HOT_WALLET_ADDRESS,
-      depositeMemo : user.depositeMemo,
+      role: user.role, // ✅ Include role
+      depositeAddress: HOT_WALLET_ADDRESS,
+      depositeMemo: user.depositeMemo,
       createdAt: user.createdAt.toISOString(),
     };
 
@@ -262,9 +260,39 @@ export class AuthServices {
       email: user.email,
       username: user.username,
       fullName: user.fullName,
-      depositeAddress:HOT_WALLET_ADDRESS,
-      depositeMemo : user.depositeMemo,
+      role: user.role, // ✅ Include role
+      depositeAddress: HOT_WALLET_ADDRESS,
+      depositeMemo: user.depositeMemo,
       createdAt: user.createdAt.toISOString(),
+    };
+  }
+
+  // ✅ NEW: Promote user to admin (superadmin only)
+  async promoteToAdmin(
+    adminUserId: string,
+    targetUserId: string
+  ) {
+    // Check if requester is superadmin
+    const admin = await prisma.user.findUnique({
+      where: { id: adminUserId },
+    });
+
+    if (!admin || admin.role !== 'SUPERADMIN') {
+      throw new Error('Unauthorized: Only superadmins can promote users');
+    }
+
+    // Promote target user
+    const updatedUser = await prisma.user.update({
+      where: { id: targetUserId },
+      data: { role: 'ADMIN' },
+    });
+
+    console.log(`✅ User ${updatedUser.username} promoted to ADMIN`);
+
+    return {
+      userId: updatedUser.id,
+      username: updatedUser.username,
+      role: updatedUser.role,
     };
   }
 }
