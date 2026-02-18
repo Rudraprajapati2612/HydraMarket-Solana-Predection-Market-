@@ -1,0 +1,10 @@
+/home/rudra2612/Projects/Hydra-market/apps/matching-engine/target/debug/deps/rdkafka_sys-9c23eab8f0183fa9.d: /home/rudra2612/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rdkafka-sys-4.10.0+2.12.1/src/lib.rs /home/rudra2612/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rdkafka-sys-4.10.0+2.12.1/src/bindings.rs /home/rudra2612/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rdkafka-sys-4.10.0+2.12.1/src/helpers.rs /home/rudra2612/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rdkafka-sys-4.10.0+2.12.1/src/types.rs
+
+/home/rudra2612/Projects/Hydra-market/apps/matching-engine/target/debug/deps/librdkafka_sys-9c23eab8f0183fa9.rlib: /home/rudra2612/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rdkafka-sys-4.10.0+2.12.1/src/lib.rs /home/rudra2612/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rdkafka-sys-4.10.0+2.12.1/src/bindings.rs /home/rudra2612/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rdkafka-sys-4.10.0+2.12.1/src/helpers.rs /home/rudra2612/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rdkafka-sys-4.10.0+2.12.1/src/types.rs
+
+/home/rudra2612/Projects/Hydra-market/apps/matching-engine/target/debug/deps/librdkafka_sys-9c23eab8f0183fa9.rmeta: /home/rudra2612/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rdkafka-sys-4.10.0+2.12.1/src/lib.rs /home/rudra2612/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rdkafka-sys-4.10.0+2.12.1/src/bindings.rs /home/rudra2612/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rdkafka-sys-4.10.0+2.12.1/src/helpers.rs /home/rudra2612/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rdkafka-sys-4.10.0+2.12.1/src/types.rs
+
+/home/rudra2612/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rdkafka-sys-4.10.0+2.12.1/src/lib.rs:
+/home/rudra2612/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rdkafka-sys-4.10.0+2.12.1/src/bindings.rs:
+/home/rudra2612/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rdkafka-sys-4.10.0+2.12.1/src/helpers.rs:
+/home/rudra2612/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rdkafka-sys-4.10.0+2.12.1/src/types.rs:

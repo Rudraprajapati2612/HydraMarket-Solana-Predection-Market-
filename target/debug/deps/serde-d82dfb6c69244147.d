@@ -1,0 +1,14 @@
+/home/rudra2612/Projects/Hydra-market/target/debug/deps/serde-d82dfb6c69244147.d: /home/rudra2612/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/rudra2612/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/rudra2612/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/rudra2612/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/rudra2612/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /home/rudra2612/Projects/Hydra-market/target/debug/build/serde-68117967c4be6c9b/out/private.rs
+
+/home/rudra2612/Projects/Hydra-market/target/debug/deps/libserde-d82dfb6c69244147.rlib: /home/rudra2612/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/rudra2612/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/rudra2612/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/rudra2612/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/rudra2612/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /home/rudra2612/Projects/Hydra-market/target/debug/build/serde-68117967c4be6c9b/out/private.rs
+
+/home/rudra2612/Projects/Hydra-market/target/debug/deps/libserde-d82dfb6c69244147.rmeta: /home/rudra2612/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/rudra2612/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/rudra2612/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/rudra2612/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/rudra2612/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /home/rudra2612/Projects/Hydra-market/target/debug/build/serde-68117967c4be6c9b/out/private.rs
+
+/home/rudra2612/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs:
+/home/rudra2612/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs:
+/home/rudra2612/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs:
+/home/rudra2612/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs:
+/home/rudra2612/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs:
+/home/rudra2612/Projects/Hydra-market/target/debug/build/serde-68117967c4be6c9b/out/private.rs:
+
+# env-dep:OUT_DIR=/home/rudra2612/Projects/Hydra-market/target/debug/build/serde-68117967c4be6c9b/out

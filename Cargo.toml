@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "apps/matching-engine"
+]
+
+resolver = "2"
