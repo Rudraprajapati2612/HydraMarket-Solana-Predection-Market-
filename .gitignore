@@ -37,4 +37,6 @@ yarn-error.log*
 .DS_Store
 *.pem
 
-target
+/target
+**/target
+Cargo.lock

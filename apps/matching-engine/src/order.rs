@@ -6,8 +6,8 @@ use uuid::Uuid;
 
 pub struct  Order{
     pub order_id : Uuid,
-    pub user_id : Uuid,
-    pub market_id : Uuid,
+    pub user_id : String,
+    pub market_id : String,
     pub side : OrderSide,
     pub outcome : Outcome,
     pub order_type : OrderType,
@@ -19,18 +19,19 @@ pub struct  Order{
     pub created_at : DateTime<Utc>,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-
 pub enum OrderSide {
     BUY,    
     SELL
 }
+
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Outcome {
     YES,
     NO,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum  OrderType {
     LIMIT,
     MARKET,

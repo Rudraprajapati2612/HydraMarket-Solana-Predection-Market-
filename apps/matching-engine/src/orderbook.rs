@@ -19,7 +19,7 @@ pub struct  OrderBook{
     pub no_bids : Arc<RwLock<PriceLevel>>,
     pub no_asks : Arc<RwLock<PriceLevel>>,
 
-    orders : Arc<DashMap<Uuid,Order>>
+    pub orders : Arc<DashMap<Uuid,Order>>
 
 }
 
@@ -48,6 +48,7 @@ impl OrderBook{
         }
     }
 
+    // Higest buy price 
     pub fn best_bid(&self,outcome:Outcome)->Option<Decimal>{
         let bids = self.get_bids(outcome);
         let book = bids.read().unwrap();
@@ -56,7 +57,7 @@ impl OrderBook{
              .find(|(_,orders)| !orders.is_empty())
              .map(|(price,_)| *price)
     }
-
+    // Best sell order means Lowes amoung all the price 
     pub fn best_ask(&self,outcome:Outcome)->Option<Decimal>{
         let asks = self.get_asks(outcome);
 
@@ -216,6 +217,48 @@ impl OrderBook{
             .collect();
         
         OrderbookDepth { bids, asks }
+    }
+
+    pub fn push_front(&self, order: Order) {
+        let book = self.get_side_mut(order.side, order.outcome);
+        let mut book_guard = book.write().unwrap();
+        
+        book_guard
+            .entry(order.price)
+            .or_insert_with(VecDeque::new)
+            .push_front(order.clone());
+        
+        self.orders.insert(order.order_id, order);
+    }
+
+    pub fn would_self_trade(
+        &self,
+        user_id: &str,
+        side: OrderSide,
+        outcome: Outcome,
+        price: Decimal,
+    ) -> bool {
+        let opposite = match side {
+            OrderSide::BUY => self.get_asks(outcome),
+            OrderSide::SELL => self.get_bids(outcome),
+        };
+        
+        let book = opposite.read().unwrap();
+        
+        // For BUY: check asks at or below our price
+        // For SELL: check bids at or above our price
+        let mut range: Box<dyn Iterator<Item = (&Decimal, &VecDeque<Order>)>> = match side {
+            OrderSide::BUY => Box::new(
+                book.range(..=price)
+            ),
+            OrderSide::SELL => Box::new(
+                book.range(price..)
+            ),
+        };
+        
+        range.any(|(_, orders)| {
+            orders.iter().any(|o| o.user_id == user_id)
+        })
     }
 
     fn get_bids(&self,outcome:Outcome)->&Arc<RwLock<PriceLevel>>{

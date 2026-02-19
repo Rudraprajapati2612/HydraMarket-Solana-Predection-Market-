@@ -1,0 +1,57 @@
+syntax = "proto3";
+package matching_engine;
+
+service MatchingEngine {
+  rpc PlaceOrder(PlaceOrderRequest) returns (PlaceOrderResponse);
+  rpc GetOrderbook(GetOrderbookRequest) returns (GetOrderbookResponse);
+}
+
+message PlaceOrderRequest {
+  string user_id = 1;
+  string market_id = 2;
+  string side = 3;
+  string outcome = 4;
+  string order_type = 5;
+  string price = 6;
+  string quantity = 7;
+  optional string reservation_id = 8;
+}
+
+message PlaceOrderResponse {
+  string order_id = 1;
+  string status = 2;
+  repeated Trade trades = 3;
+  repeated ComplementaryMatch complementary_matches = 4;
+}
+
+message Trade {
+  string trade_id = 1;
+  string buyer_id = 2;
+  string seller_id = 3;
+  string quantity = 4;
+  string price = 5;
+}
+
+message ComplementaryMatch {
+  string trade_id = 1;
+  string yes_buyer_id = 2;
+  string no_buyer_id = 3;
+  string quantity = 4;
+  string yes_price = 5;
+  string no_price = 6;
+}
+
+message GetOrderbookRequest {
+  string market_id = 1;
+  string outcome = 2;
+}
+
+message GetOrderbookResponse {
+  repeated PriceLevel bids = 1;
+  repeated PriceLevel asks = 2;
+}
+
+message PriceLevel {
+  string price = 1;
+  string quantity = 2;
+}

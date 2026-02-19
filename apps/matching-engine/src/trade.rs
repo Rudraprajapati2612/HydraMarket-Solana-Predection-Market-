@@ -22,7 +22,7 @@ pub struct  Trade{
     pub timestamp : DateTime<Utc>
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone,Copy, Serialize, Deserialize,PartialEq, Eq)]
 pub enum TradeType {
     SECONDARY,      // Transfer existing tokens (no blockchain)
     COMPLEMENTARY,      

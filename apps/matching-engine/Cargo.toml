@@ -40,6 +40,7 @@ chrono = { version = "0.4", features = ["serde"] }
 
 # Decimal
 rust_decimal = { version = "1.33", features = ["serde"] }
+rust_decimal_macros = "1.40.0"
 
 [build-dependencies]
 tonic-build = "0.11"
