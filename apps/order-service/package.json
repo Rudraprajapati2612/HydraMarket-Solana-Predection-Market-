@@ -1,0 +1,22 @@
+{
+  "name": "order-service",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "exports":{
+       "./order" :"./src/services/OrderService.ts"
+  },
+  "peerDependencies": {
+    "typescript": "^5",
+    "db": "*"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "^1.14.3",
+    "@grpc/proto-loader": "^0.8.0",
+    "ioredis": "^5.9.3",
+    "user-services":"*"
+  }
+}

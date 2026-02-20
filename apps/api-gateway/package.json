@@ -29,6 +29,7 @@
     "ioredis": "^5.9.2",
     "market-service": "*",
     "user-services": "*",
-    "zod": "^4.3.6"
+    "zod": "^4.3.6",
+    "order-service" : "*"
   }
 }

@@ -215,6 +215,7 @@ model Order{
   market              Market                      @relation(fields: [marketId],references: [id])
 
   side              OrderSide         // BUY_YES, BUY_NO, SELL_YES, SELL_NO
+  outcome           OrderOutcome
   amount            Decimal           @db.Decimal(20, 6) // USDC amount
   price             Decimal           @db.Decimal(5, 4)  // 0.0000 - 1.0000
   quantity          Decimal           @db.Decimal(20, 6) // Token quantity
@@ -232,11 +233,13 @@ model Order{
 
 }
 
+enum OrderOutcome{
+  NO
+  YES
+}
 enum OrderSide {
-  BUY_YES
-  BUY_NO
-  SELL_YES
-  SELL_NO
+  BUY
+  SELL
 }
 
 enum OrderStatus {
@@ -245,6 +248,8 @@ enum OrderStatus {
   FILLED
   CANCELLED
   FAILED
+  MATCHED
+  OPEN
 }
 
 model Position{
@@ -299,4 +304,29 @@ enum TransactionStatus {
   PROCESSING
   CONFIRMED
   FAILED
+}
+
+
+model Trade{
+  id                 String                @id @default(uuid())
+  marketId           String                @map("market_id")
+  outcome            String
+  buyerId            String                @map("buyer_id")
+  sellerId           String                @map("seller_id")
+  quantity           Decimal               @db.Decimal(20, 6)
+  price              Decimal               @db.Decimal(5, 4)
+  tradeType          TradeType             @map("trade_type")
+  createdAt          DateTime              @default(now()) @map("created_at")
+  
+  @@index([marketId])
+  @@index([buyerId])
+  @@index([sellerId])
+  @@map("trades")
+
+}
+
+
+enum TradeType{
+  SECONDARY
+  COMPLEMENTARY
 }

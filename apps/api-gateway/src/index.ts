@@ -10,6 +10,7 @@ import { depositeRoute } from "./routes/deposite";
 import  { withdrawalRoute } from "./routes/withdrawals";
 import { marketRoutes } from "./routes/market";
 import { adminSetupRoutes } from "./scripts/create-admin";
+import { orderRoutes } from "./routes/orders";
 
 const PORT = parseInt(process.env.PORT || '3000');
 
@@ -53,6 +54,7 @@ const app = new Elysia()
   .use(withdrawalRoute)
   .use(marketRoutes)
   .use(adminSetupRoutes)
+  .use(orderRoutes)
   .onError(({ code, error, set }) => {
     console.error('Error:', error);
 
