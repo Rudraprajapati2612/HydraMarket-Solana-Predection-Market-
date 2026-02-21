@@ -257,7 +257,7 @@ model Position{
   userId             String             @map("user_id")
   user               User               @relation(fields: [userId],references: [id])
   marketId           String             @map("market_id")
-  market             Market             @relation(references: [marketId],fields: [id])
+  market             Market             @relation(fields: [marketId],references: [id])
   
   yesTokens         Decimal             @default(0) @map("yes_tokens") @db.Decimal(20, 6)
   noTokens          Decimal             @default(0) @map("no_tokens") @db.Decimal(20, 6)

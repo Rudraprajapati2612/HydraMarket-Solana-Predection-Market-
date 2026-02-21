@@ -17,7 +17,7 @@ export const orderRoutes = new Elysia({prefix:'/orders'})
             outcome: body.outcome,
             amount: body.amount,
             price: body.price,
-            orderType: 'LIMIT' 
+            orderType: body.orderType as 'LIMIT' | 'MARKET' | 'POSTONLY'
         });
         
         return {
@@ -31,6 +31,11 @@ export const orderRoutes = new Elysia({prefix:'/orders'})
           outcome: t.Union([t.Literal('YES'), t.Literal('NO')]),
           amount: t.Number({ minimum: 1 }),
           price: t.Number({ minimum: 0.01, maximum: 0.99 }),
+          orderType: t.Union([
+            t.Literal('LIMIT'),
+            t.Literal('MARKET'),
+            t.Literal('POSTONLY')
+          ]),
         }),
       })
       

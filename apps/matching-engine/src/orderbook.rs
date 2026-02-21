@@ -48,7 +48,7 @@ impl OrderBook{
         }
     }
 
-    // Higest buy price 
+    // Higest buy price == Best buy price 
     pub fn best_bid(&self,outcome:Outcome)->Option<Decimal>{
         let bids = self.get_bids(outcome);
         let book = bids.read().unwrap();

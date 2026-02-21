@@ -76,11 +76,43 @@ impl MatchingEngine for MatchingEngineService {
         
         info!("✅ Matched: trades={}, cmatch={}", result.trades.len(), result.complementary_matches.len());
         
+        let trades = result
+        .trades
+        .iter()
+        .map(|t| Trade {
+            trade_id: t.trade_id.to_string(),
+            buyer_id: t.buyer_id.clone(),
+            seller_id: t.seller_id.clone(),
+            quantity: t.quantity.to_string(),
+            price: t.price.to_string(),
+            market_id : t.market_id.to_string(),
+            outcome : format!("{:?}",t.outcome),
+            trade_type : format!("{:?}",t.trade_type),
+            timestamp : t.timestamp.to_string()
+        })
+        .collect();
+    
+    // ✅ FIX: Actually build the complementary_matches array
+    let complementary_matches = result
+        .complementary_matches
+        .iter()
+        .map(|c| ComplementaryMatch {
+            trade_id: c.trade_id.to_string(),
+            yes_buyer_id: c.yes_buyer_id.clone(),
+            no_buyer_id: c.no_buyer_id.clone(),
+            quantity: c.quantity.to_string(),
+            yes_price: c.yes_price.to_string(),
+            no_price: c.no_price.to_string(),
+            market_id : c.market_id.to_string(),
+            timestamp : c.timestamp.to_string()
+        })
+        .collect();
+    
         Ok(Response::new(PlaceOrderResponse {
             order_id: result.order.order_id.to_string(),
             status: format!("{:?}", result.order.order_status),
-            trades: vec![],
-            complementary_matches: vec![],
+            trades,                      // ✅ Now populated
+            complementary_matches,       // ✅ Now populated
         }))
     }
     

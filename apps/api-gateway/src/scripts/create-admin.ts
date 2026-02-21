@@ -32,11 +32,18 @@ export const adminSetupRoutes = new Elysia({ prefix: '/admin' })
     }
     
     // Promote user to superadmin
-    const user = await prisma.user.update({
+    const user = await prisma.user.findUnique({
       where: { email: body.email },
-      data: { role: 'SUPERADMIN' },
     });
     
+    if (!user) {
+      throw new Error('User does not exist. User must register first.');
+    }
+    
+    const updatedUser = await prisma.user.update({
+      where: { id: user.id },
+      data: { role: 'SUPERADMIN' },
+    });
     console.log(`✅ First superadmin created: ${user.username}`);
     
     return {
