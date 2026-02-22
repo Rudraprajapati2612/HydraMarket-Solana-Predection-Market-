@@ -30,7 +30,12 @@ message Trade {
   string seller_id = 3;
   string quantity = 4;
   string price = 5;
+  string market_id = 6;
+  string outcome = 7;
+  string trade_type = 8;
+  string timestamp = 9;
 }
+
 
 message ComplementaryMatch {
   string trade_id = 1;

@@ -8,10 +8,12 @@ use tracing::info;
 use uuid::Uuid;
 use chrono::Utc;
 
+use matching_engine::Trade;
 use crate::matcher::Matcher;
 use crate::order::{Order, OrderSide, OrderStatus, OrderType, Outcome};
 use crate::orderbook::OrderBook;
 use crate::redis_client::RedisClient;
+use crate::trade::TradeType;
 
 pub mod matching_engine {
     tonic::include_proto!("matching_engine");
@@ -79,16 +81,38 @@ impl MatchingEngine for MatchingEngineService {
         let trades = result
         .trades
         .iter()
-        .map(|t| Trade {
-            trade_id: t.trade_id.to_string(),
-            buyer_id: t.buyer_id.clone(),
-            seller_id: t.seller_id.clone(),
-            quantity: t.quantity.to_string(),
-            price: t.price.to_string(),
-            market_id : t.market_id.to_string(),
-            outcome : format!("{:?}",t.outcome),
-            trade_type : format!("{:?}",t.trade_type),
-            timestamp : t.timestamp.to_string()
+        .map(|t| {
+            let outcome_str = match t.outcome {
+                Outcome::YES => "YES".to_string(),
+                Outcome::NO => "NO".to_string(),
+            };
+    
+            let trade_type_str = match t.trade_type {
+                TradeType::SECONDARY => "SECONDARY".to_string(),
+                TradeType::COMPLEMENTARY => "COMPLEMENTARY".to_string(),
+            };
+    
+            // 🔴 THIS LOG IS CRITICAL
+            info!(
+                "BUILDING PROTO TRADE -> id={}, market={}, outcome={}, type={}, ts={}",
+                t.trade_id,
+                t.market_id,
+                outcome_str,
+                trade_type_str,
+                t.timestamp
+            );
+    
+            Trade {
+                trade_id: t.trade_id.to_string(),
+                buyer_id: t.buyer_id.clone(),
+                seller_id: t.seller_id.clone(),
+                quantity: t.quantity.to_string(),
+                price: t.price.to_string(),
+                market_id: t.market_id.clone(),
+                outcome: outcome_str,
+                trade_type: trade_type_str,
+                timestamp: t.timestamp.to_string(),
+            }
         })
         .collect();
     
@@ -107,10 +131,21 @@ impl MatchingEngine for MatchingEngineService {
             timestamp : c.timestamp.to_string()
         })
         .collect();
-    
+        
+        let status = match  result.order.order_status {
+            OrderStatus::PENDING => "OPEN",
+            OrderStatus::OPEN => "OPEN",
+            OrderStatus::FILLED => "FILLED",
+            OrderStatus::PARTIAL => "PARTIAL",
+            OrderStatus::CANCELLED => "CANCELLED"
+        };
+        for t in &result.trades {
+            info!("TRADE FIELDS: id={} market={} outcome={:?} type={:?}", 
+                t.trade_id, t.market_id, t.outcome, t.trade_type);
+        }
         Ok(Response::new(PlaceOrderResponse {
             order_id: result.order.order_id.to_string(),
-            status: format!("{:?}", result.order.order_status),
+            status: status.to_string(),
             trades,                      // ✅ Now populated
             complementary_matches,       // ✅ Now populated
         }))

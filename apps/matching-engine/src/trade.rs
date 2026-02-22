@@ -6,7 +6,7 @@ use uuid::Uuid;
 use crate::order::{OrderSide, Outcome};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct  Trade{
+pub struct Trade{
     pub trade_id : Uuid,
     pub market_id : String,
     pub outcome : Outcome,

@@ -1,8 +1,4 @@
 
-
-
-
-
 import { prisma } from "db/client";
 import Redis from "ioredis";
 import { BalanceService } from "user-services/balance";
@@ -128,7 +124,8 @@ export class OrderService {
 
       // Secondary trades
       for (const trade of result.trades) {
-        await this.executeSecondaryTrade(trade,trade.market_id);
+        console.log("RAW TRADE FROM GRPC:", trade);
+        await this.executeSecondaryTrade(trade,params.marketId);
 
         await prisma.order.update({
           where: { id: order.id },
@@ -185,13 +182,29 @@ export class OrderService {
   }
 
   private async executeSecondaryTrade(trade: any,marketId:string) {
+    console.log("FULL TRADE OBJECT:", JSON.stringify(trade));
+  console.log("OUTCOME TYPE:", typeof trade.outcome, "VALUE:", trade.outcome);
     const buyerId = trade.buyer_id;
     const sellerId = trade.seller_id;
     const quantity = Number(trade.quantity);
     const price = Number(trade.price);
     const amount = quantity * price;
-    const outcome = trade.outcome as "YES" | "NO";
+    const outcome = (
+      trade.outcome?.toString() ||
+      trade["outcome"]?.toString()
+    )?.toUpperCase();
+    
+    if (outcome !== "YES" && outcome !== "NO") {
+      console.error("BAD TRADE PAYLOAD", JSON.stringify(trade));
+      throw new Error(`Invalid or missing trade.outcome: ${outcome}`);
+    }
+    if (!marketId) {
+        throw new Error("Invariant violation: marketId missing in secondary trade");
+    }
 
+      if (!["YES", "NO"].includes(outcome)) {
+        throw new Error(`Invalid trade outcome: ${outcome}`);
+      }
     await prisma.$transaction(async (tx) => {
       // Buyer pays USDC
       await tx.ledger.update({
