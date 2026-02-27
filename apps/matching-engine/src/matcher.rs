@@ -26,7 +26,9 @@ impl Matcher {
         
         // 1. Validate order
         self.validate_order(&order)?;
-        
+        print!("Hi there");
+
+
         // 2. Check for self-trade
         if self.orderbook.would_self_trade(
             &order.user_id,

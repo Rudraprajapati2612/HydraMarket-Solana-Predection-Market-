@@ -146,7 +146,7 @@ export class MarketService {
 
       // Initialize escrow vault
       console.log("🔐 Initializing escrow vault...");
-      await this.initializeEscrowVault(
+      const usdcVaultAta = await this.initializeEscrowVault(
         marketPda,
         escrowVaultPda,
         yesTokenMint.publicKey,
@@ -167,6 +167,7 @@ export class MarketService {
           category: params.category,
           creatorId: params.creatorId,
           marketPda: marketPda.toBase58(),
+          usdcVault : usdcVaultAta.toString(),
           escrowVaultPda: escrowVaultPda.toBase58(),
           yesTokenMint: yesTokenMint.publicKey.toBase58(),
           noTokenMint: noTokenMint.publicKey.toBase58(),
@@ -191,6 +192,7 @@ export class MarketService {
         yesTokenMint: yesTokenMint.publicKey.toBase58(),
         noTokenMint: noTokenMint.publicKey.toBase58(),
         txHash: tx,
+        usdcVault: usdcVaultAta
       };
     } catch (error: any) {
       console.error("❌ Market creation failed:", error);
@@ -243,6 +245,8 @@ export class MarketService {
 
       await this.connection.confirmTransaction(tx);
       console.log("✅ Escrow vault initialized:", tx);
+
+      return usdcVaultAta;
     } catch (error: any) {
       console.error("❌ Escrow vault initialization failed:", error);
       if (error.logs) {

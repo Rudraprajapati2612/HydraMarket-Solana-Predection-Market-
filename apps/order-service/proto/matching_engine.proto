@@ -44,6 +44,8 @@ message ComplementaryMatch {
   string quantity = 4;
   string yes_price = 5;
   string no_price = 6;
+  string market_id = 7;
+  string timestamp = 8;
 }
 
 message GetOrderbookRequest {

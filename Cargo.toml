@@ -1,6 +1,6 @@
 [workspace]
 members = [
     "apps/matching-engine"
-]
+, "apps/settlement-worker"]
 
 resolver = "2"

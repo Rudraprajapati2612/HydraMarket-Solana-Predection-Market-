@@ -105,14 +105,15 @@ export class OrderService {
             market_id: cmatch.market_id,
             yes_user_id: cmatch.yes_buyer_id,
             no_user_id: cmatch.no_buyer_id,
-            pairs: cmatch.quantity,
-            yes_price: cmatch.yes_price,
-            no_price: cmatch.no_price,
+            pairs: String(Math.round(Number(cmatch.quantity))),  // ✅ String, not number
+            yes_price: String(Number(cmatch.yes_price)),         // ✅ String
+            no_price: String(Number(cmatch.no_price)), 
             market_pda: market.marketPda,
             escrow_vault_pda: market.escrowVaultPda,
+            usdc_vault : market.usdcVault,
             yes_token_mint: market.yesTokenMint,
             no_token_mint: market.noTokenMint,
-            timestamp: cmatch.timestamp,
+            timestamp: new Date().toISOString(),
           })
         );
 
@@ -183,7 +184,7 @@ export class OrderService {
 
   private async executeSecondaryTrade(trade: any,marketId:string) {
     console.log("FULL TRADE OBJECT:", JSON.stringify(trade));
-  console.log("OUTCOME TYPE:", typeof trade.outcome, "VALUE:", trade.outcome);
+    console.log("OUTCOME TYPE:", typeof trade.outcome, "VALUE:", trade.outcome);
     const buyerId = trade.buyer_id;
     const sellerId = trade.seller_id;
     const quantity = Number(trade.quantity);

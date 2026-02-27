@@ -21,6 +21,7 @@ model User{
   password        String
   fullName        String?             @map("full_name")
   depositeMemo    String              @unique @map("deposie_memo")
+
   isActive        Boolean             @default(true) @map("is_active")
   role            UserRole            @default(USER)
   createdAt       DateTime            @default(now()) @map("created_at")
@@ -32,6 +33,7 @@ model User{
   marketCreated   Market[]
   orders            Order[]
   positions         Position[]
+  
   @@index([email])
   @@index([username])
   @@index([depositeMemo])
@@ -176,6 +178,7 @@ model Market{
 
   marketPda         String        @map("market_pda")
   escrowVaultPda    String        @map("escrow_vault_pda")
+  usdcVault         String        @map("usdc_vault")
   yesTokenMint      String        @map("yes_token_mint")
   noTokenMint       String        @map("no_token_mint")
 
