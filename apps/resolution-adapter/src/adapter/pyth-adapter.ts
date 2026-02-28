@@ -29,8 +29,8 @@ export class PythAdapter {
     question: string
   ): Promise<ResolutionResult | null> {
     try {
-      // Parse question — "Will BTC reach $100k by..."
-      const match = question.match(/Will (\w+) (?:reach|hit|exceed) \$?([\d,]+)k?/i);
+      // Parse question — examples: "Will BTC reach $100k by..." / "Will BTC hit $100,000"
+      const match = question.match(/Will (\w+) (?:reach|hit|exceed) \$?([\d,.]+)\s*(k)?/i);
       if (!match) {
         console.warn('⚠️ Could not parse question format');
         return null;
@@ -43,7 +43,15 @@ export class PythAdapter {
       }
 
       const thresholdStr = match[2]?.replace(/,/g, '');
-      const threshold = parseFloat(thresholdStr!) * 1000; // 100k = 100,000
+      const hasK = Boolean(match[3]);
+      const baseThreshold = parseFloat(thresholdStr!);
+
+      if (!Number.isFinite(baseThreshold)) {
+        console.warn('⚠️ Could not parse numeric threshold from question');
+        return null;
+      }
+
+      const threshold = hasK ? baseThreshold * 1000 : baseThreshold;
 
       const feedId = this.FEED_IDS[`${asset}/USD`];
 

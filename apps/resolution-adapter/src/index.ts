@@ -12,17 +12,28 @@ async function main() {
   // Load configuration
   const rpcUrl = process.env.SOLANA_RPC_URL || '<https://api.devnet.solana.com>';
   const adminPrivateKey = process.env.ADMIN_PRIVATE_KEY!;
+  const resolutionAuthorityPrivateKey = process.env.RESOLUTION_AUTHORITY_PRIVATE_KEY || adminPrivateKey;
   const resolutionProgramId = new PublicKey(process.env.RESOLUTION_ADAPTER_PROGRAM_ID!);
   const marketProgramId = new PublicKey(process.env.MARKET_REGISTRY_PROGRAM_ID!);
   const usdcMint = new PublicKey(process.env.USDC_MINT!);
+  const winnerUsdcAccount = process.env.WINNER_USDC_ACCOUNT
+    ? new PublicKey(process.env.WINNER_USDC_ACCOUNT)
+    : null;
+  const protocolTreasuryUsdcAccount = process.env.PROTOCOL_TREASURY_USDC_ACCOUNT
+    ? new PublicKey(process.env.PROTOCOL_TREASURY_USDC_ACCOUNT)
+    : null;
+  const autoFinalizeOnchain = (process.env.AUTO_FINALIZE_ONCHAIN || 'false').toLowerCase() === 'true';
   const rapidApiKey = process.env.RAPIDAPI_CRICKET_KEY || '';
 
   // Load admin keypair
   const adminKeypair = Keypair.fromSecretKey(bs58.decode(adminPrivateKey));
+  const resolutionAuthority = Keypair.fromSecretKey(bs58.decode(resolutionAuthorityPrivateKey));
 
   console.log('✅ Configuration loaded');
   console.log(`   Admin: ${adminKeypair.publicKey.toBase58()}`);
+  console.log(`   Resolution Authority: ${resolutionAuthority.publicKey.toBase58()}`);
   console.log(`   RPC: ${rpcUrl}`);
+  console.log(`   Auto-finalize on-chain: ${autoFinalizeOnchain}`);
 
   // Initialize service
   const resolutionService = new ResolutionService(
@@ -31,7 +42,11 @@ async function main() {
     resolutionProgramId,
     marketProgramId,
     usdcMint,
-    rapidApiKey
+    rapidApiKey,
+    autoFinalizeOnchain,
+    winnerUsdcAccount,
+    protocolTreasuryUsdcAccount,
+    resolutionAuthority
   );
 
   // Run immediately on startup
