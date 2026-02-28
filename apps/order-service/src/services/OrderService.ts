@@ -98,6 +98,9 @@ export class OrderService {
 
       // Complementary → mint flow
       for (const cmatch of result.complementary_matches) {
+        const yesCanonicalOrderId = cmatch.yes_reservation_id;
+        const noCanonicalOrderId = cmatch.no_reservation_id;
+
         await redis.lpush(
           "mint:queue",
           JSON.stringify({
@@ -105,6 +108,11 @@ export class OrderService {
             market_id: cmatch.market_id,
             yes_user_id: cmatch.yes_buyer_id,
             no_user_id: cmatch.no_buyer_id,
+            // Canonical DB order IDs from reservation_id; do not use matching-engine internal order_id.
+            yes_order_id : yesCanonicalOrderId,
+            no_order_id : noCanonicalOrderId,
+            yes_reservation_id: yesCanonicalOrderId,
+            no_reservation_id: noCanonicalOrderId,
             pairs: String(Math.round(Number(cmatch.quantity))),  // ✅ String, not number
             yes_price: String(Number(cmatch.yes_price)),         // ✅ String
             no_price: String(Number(cmatch.no_price)), 
@@ -366,5 +374,4 @@ async getOrderbook(marketId: string, outcome: 'YES' | 'NO') {
     });
 }
 }
-
 

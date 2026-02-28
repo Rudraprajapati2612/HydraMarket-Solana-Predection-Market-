@@ -13,6 +13,14 @@ pub struct  MintRequest{
     pub yes_price : String,
     pub no_price : String,
     pub market_pda : String,
+    #[serde(default)]
+    pub yes_order_id: Option<String>,
+    #[serde(default)]
+    pub no_order_id : Option<String>,
+    #[serde(default)]
+    pub yes_reservation_id: Option<String>,
+    #[serde(default)]
+    pub no_reservation_id: Option<String>,
     pub escrow_vault_pda : String,
     pub yes_token_mint : String,
     pub no_token_mint : String,

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use solana_sdk::pubkey::Pubkey;
 use std::{str::FromStr, sync::Arc};
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 mod config;
 mod redis_client;
@@ -164,11 +164,45 @@ async fn process_settlement(
     ).await?;
     
     // 8. Mark orders as FILLED
-    database.mark_orders_filled(
-        &request.yes_user_id,
-        &request.no_user_id,
-        &request.market_id,
-    ).await?;
+    let yes_order_id = request
+        .yes_reservation_id
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .or(request.yes_order_id.as_deref().filter(|s| !s.is_empty()));
+    if let Some(yes_order_id) = yes_order_id {
+        let updated = database.mark_order_filled(yes_order_id).await?;
+        if !updated {
+            warn!(
+                "Order {} not found for settlement {}, skipping YES order fill update",
+                yes_order_id, settlement_id
+            );
+        }
+    } else {
+        warn!(
+            "Missing YES canonical order id (yes_reservation_id/yes_order_id) for settlement {}, skipping order fill update",
+            settlement_id
+        );
+    }
+
+    let no_order_id = request
+        .no_reservation_id
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .or(request.no_order_id.as_deref().filter(|s| !s.is_empty()));
+    if let Some(no_order_id) = no_order_id {
+        let updated = database.mark_order_filled(no_order_id).await?;
+        if !updated {
+            warn!(
+                "Order {} not found for settlement {}, skipping NO order fill update",
+                no_order_id, settlement_id
+            );
+        }
+    } else {
+        warn!(
+            "Missing NO canonical order id (no_reservation_id/no_order_id) for settlement {}, skipping order fill update",
+            settlement_id
+        );
+    }
     
     info!("✅ Settlement complete: {}", settlement_id);
     

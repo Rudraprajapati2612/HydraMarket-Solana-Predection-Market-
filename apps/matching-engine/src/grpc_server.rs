@@ -128,7 +128,11 @@ impl MatchingEngine for MatchingEngineService {
             yes_price: c.yes_price.to_string(),
             no_price: c.no_price.to_string(),
             market_id : c.market_id.to_string(),
-            timestamp : c.timestamp.to_string()
+            timestamp : c.timestamp.to_string(),
+            yes_order_id: c.yes_order_id.to_string(),
+            no_order_id: c.no_order_id.to_string(),
+            yes_reservation_id: c.yes_reservation_id.clone(),
+            no_reservation_id: c.no_reservation_id.clone(),
         })
         .collect();
         

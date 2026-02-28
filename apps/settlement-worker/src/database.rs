@@ -224,32 +224,66 @@ impl Database {
 
         Ok(())
     }
+    
+    /// Mark a single order as FILLED.
+    /// Returns `Ok(true)` if a row was updated, `Ok(false)` if not found.
+pub async fn mark_order_filled(
+    &self,
+    order_id: &str,
+) -> Result<bool> {
+    let client = self.client.lock().await;
 
-    /// Update order status to FILLED
-    pub async fn mark_orders_filled(
-        &self,
-        yes_user_id: &str,
-        no_user_id: &str,
-        market_id: &str,
-    ) -> Result<()> {
-        let client = self.client.lock().await;
-
-        let rows = client
-            .execute(
-                r#"
+    let rows = client
+        .execute(
+            r#"
             UPDATE orders
-            SET status = 'FILLED', updated_at = NOW()
-            WHERE user_id IN ($1, $2)
-            AND market_id = $3
-            AND status = 'MATCHED'
-            AND created_at >= NOW() - INTERVAL '1 hour'
+            SET 
+                status = 'FILLED',
+                filled_quantity = quantity,
+                updated_at = NOW()
+            WHERE id = $1
             "#,
-                &[&yes_user_id, &no_user_id, &market_id],
-            )
-            .await?;
+            &[&order_id],
+        )
+        .await?;
 
-        info!("✅ Updated {} order(s) to FILLED status", rows);
-
-        Ok(())
+    if rows == 0 {
+        return Ok(false);
     }
+
+    info!("✅ Order {} marked as FILLED", order_id);
+
+    Ok(true)
+}
+
+/// Increment filled quantity and auto-update status
+pub async fn increment_filled_quantity(
+    &self,
+    order_id: &str,
+    fill_quantity: Decimal,
+) -> Result<()> {
+    let client = self.client.lock().await;
+
+    client
+        .execute(
+            r#"
+            UPDATE orders
+            SET 
+                filled_quantity = COALESCE(filled_quantity, 0) + $2,
+                status = CASE 
+                    WHEN COALESCE(filled_quantity, 0) + $2 >= quantity
+                    THEN 'FILLED'
+                    ELSE 'PARTIALLY_FILLED'
+                END,
+                updated_at = NOW()
+            WHERE id = $1
+            "#,
+            &[&order_id, &fill_quantity],
+        )
+        .await?;
+
+    info!("✅ Updated filled quantity for order {}", order_id);
+
+    Ok(())
+}
 }

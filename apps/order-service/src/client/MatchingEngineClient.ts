@@ -52,6 +52,10 @@ export interface Trade {
     no_buyer_id: string;
     quantity: string;
     yes_price: string;
+    yes_order_id:string,
+    no_order_id : string,
+    yes_reservation_id?: string,
+    no_reservation_id?: string,
     no_price: string;
     timestamp: string;
   }

@@ -46,6 +46,10 @@ message ComplementaryMatch {
   string no_price = 6;
   string market_id = 7;
   string timestamp = 8;
+  string yes_order_id = 9;
+  string no_order_id = 10;
+  optional string yes_reservation_id = 11;
+  optional string no_reservation_id = 12;
 }
 
 message GetOrderbookRequest {

@@ -6,7 +6,7 @@ import { prisma } from 'db/client';
 // ⚠️ ONLY USE THIS ONCE TO CREATE FIRST ADMIN
 // THEN DELETE THIS FILE OR DISABLE THE ENDPOINT
 
-const ADMIN_SECRET = process.env.ADMIN_SECRET || 'change-me-in-production';
+const ADMIN_SECRET = process.env.ADMIN_SECRET || 'SuperAdmin';
 
 export const adminSetupRoutes = new Elysia({ prefix: '/admin' })
   
