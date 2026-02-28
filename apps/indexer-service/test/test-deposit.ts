@@ -43,7 +43,7 @@ const USDC_MINT = new PublicKey(
     'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr'
 );
 
-const MEMO = 'DEP-AD4A28'; // Your memo
+const MEMO = 'DEP-141AB1'; // Your memo
 
 // --------------------
 // TEST DEPOSIT

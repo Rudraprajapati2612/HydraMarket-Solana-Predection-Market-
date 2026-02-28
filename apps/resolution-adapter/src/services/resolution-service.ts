@@ -3,7 +3,7 @@ import * as anchor from '@coral-xyz/anchor';
 import { ResolutionClient } from '../solana/resolution-client';
 import { PythAdapter } from '../adapter/pyth-adapter';
 import { CricketAdapter } from '../adapter/cricket-adapter';
-import type { Market, Outcome,MarketState } from '../types';
+import type { Market, Outcome, MarketState } from '../types';
 import type { MarketRegistry } from '../tsIdl/market_registry';
 
 
@@ -87,7 +87,7 @@ export class ResolutionService {
       console.log('   Initializing resolution...');
 
       const category = market.resolutionSource.toLowerCase().includes('pyth') ||
-                      market.resolutionSource.toLowerCase().includes('crypto')
+        market.resolutionSource.toLowerCase().includes('crypto')
         ? 'crypto'
         : 'sports';
 
@@ -132,17 +132,17 @@ export class ResolutionService {
    */
   private async getOpenMarkets(): Promise<Market[]> {
     const idl = require('../idl/market_registry.json');
-  
+
     const provider = new anchor.AnchorProvider(
       this.connection,
       {} as anchor.Wallet,
       { commitment: 'confirmed' }
     );
-  
+
     const program = new anchor.Program<MarketRegistry>(idl, provider);
-  
+
     const accounts = await program.account.market.all();
-  
+
     return accounts
       .filter(acc => {
         const rawState = Object.keys(acc.account.state)[0];
@@ -150,23 +150,25 @@ export class ResolutionService {
       })
       .map(acc => {
         const rawState = Object.keys(acc.account.state)[0];
-  
+
         // Guard against undefined (satisfies TS18048)
         if (!rawState) {
           throw new Error(`Market ${acc.publicKey.toBase58()} has no state`);
         }
-  
+
         const state =
           (rawState.charAt(0).toUpperCase() + rawState.slice(1)) as MarketState;
-  
+
         // Fix TS2464: cast the key to string explicitly before using as computed property
         const resolutionOutcome = acc.account.resolutionOutcome
           ? (() => {
-              const key = Object.keys(acc.account.resolutionOutcome)[0] as string | undefined;
-              return key ? ({ [key]: {} } as Outcome) : null;
-            })()
+            const key = Object.keys(acc.account.resolutionOutcome)[0] as string | undefined;
+            return key ? ({ [key]: {} } as Outcome) : null;
+          })()
           : null;
-  
+
+
+
         return {
           publicKey: acc.publicKey,
           // Fix TS2322: convert number[] → Buffer so it satisfies Market['marketId']
