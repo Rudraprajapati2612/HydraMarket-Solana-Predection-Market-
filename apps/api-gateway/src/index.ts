@@ -7,10 +7,11 @@ import { publicRoutes } from "./routes/public";
 import { AppError } from './types';
 import { balanceRoute } from "./routes/balance";
 import { depositeRoute } from "./routes/deposite";
-import  { withdrawalRoute } from "./routes/withdrawals";
+import  { withdrawalRoutes } from "./routes/withdrawals";
 import { marketRoutes } from "./routes/market";
 import { adminSetupRoutes } from "./scripts/create-admin";
 import { orderRoutes } from "./routes/orders";
+import { payoutRoutes } from "./routes/payout";
 
 const PORT = parseInt(process.env.PORT || '3000');
 
@@ -51,7 +52,8 @@ const app = new Elysia()
   .use(publicRoutes)
   .use(balanceRoute)
   .use(depositeRoute)
-  .use(withdrawalRoute)
+  .use(payoutRoutes)
+  .use(withdrawalRoutes)
   .use(marketRoutes)
   .use(adminSetupRoutes)
   .use(orderRoutes)

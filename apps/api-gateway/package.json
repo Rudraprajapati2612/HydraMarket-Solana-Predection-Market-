@@ -15,6 +15,7 @@
     "db": "*"
   },
   "dependencies": {
+    "@coral-xyz/anchor": "^0.32.1",
     "@elysiajs/bearer": "^1.4.3",
     "@elysiajs/cors": "^1.4.1",
     "@elysiajs/jwt": "^1.4.0",
@@ -22,14 +23,15 @@
     "@grpc/grpc-js": "^1.14.3",
     "@grpc/proto-loader": "^0.8.0",
     "@prisma/client": "^7.3.0",
+    "@solana/spl-token": "^0.4.14",
     "@solana/web3.js": "^1.98.4",
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.2.3",
     "elysia": "^1.4.22",
     "ioredis": "^5.9.2",
     "market-service": "*",
+    "order-service": "*",
     "user-services": "*",
-    "zod": "^4.3.6",
-    "order-service" : "*"
+    "zod": "^4.3.6"
   }
 }

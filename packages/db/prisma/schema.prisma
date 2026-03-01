@@ -333,3 +333,19 @@ enum TradeType{
   SECONDARY
   COMPLEMENTARY
 }
+
+model ReconciliationLog {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  marketId    String   @map("market_id")
+  txSignature String   @map("tx_signature")
+  type        String   // "CLAIM_PAYOUT", "WITHDRAWAL", etc.
+  status      String   // "PENDING_RECONCILIATION", "RESOLVED"
+  metadata    String?  @db.Text  // JSON for extra context
+  createdAt   DateTime @default(now()) @map("created_at")
+  resolvedAt  DateTime? @map("resolved_at")
+
+  @@index([status])
+  @@index([userId])
+  @@map("reconciliation_logs")
+}
