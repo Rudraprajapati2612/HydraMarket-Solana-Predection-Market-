@@ -1,161 +1,153 @@
-import {Elysia,t} from "elysia";
-import { BalanceService } from "user-services/balance";
-import Redis from "ioredis";
-import { prisma } from "db/client"
-import { PublicKey } from "@solana/web3.js";
-import { authPlugin } from "../plugins/auth";
-import { publicRoutes } from "./public";
-import { AppError } from "../types";
-
+import { Elysia, t } from 'elysia';
+import { prisma } from 'db/client';
+import { BalanceService } from 'user-services/balance';
+import { authPlugin } from '../plugins/auth';
+import { AppError } from '../types';
 const balanceService = new BalanceService();
-const redis = new Redis();
 
+export const withdrawalRoutes = new Elysia({ prefix: '/withdrawals' })
 
-export const withdrawalRoute = new Elysia({prefix:'/withdrawal'})
-.use(authPlugin())
-.post('/request',async({user,body})=>{
+  /**
+   * POST /withdrawals
+   * Request a withdrawal
+   */
+
+  .use(authPlugin())
+  .post('/', async ({ user, body }) => {
+
     if(!user){
         throw new AppError('Unauthorized', 401, 'UNAUTHORIZED');
     }
-    try{
-        new PublicKey(body.destinationAddress);
-    }catch(e){
-        throw new Error("Invalid solana address")
+    console.log(`💸 Withdrawal request from ${user.userId}`);
+
+    // Validate input
+    if (body.amount <= 0) {
+      return { success: false, error: 'Invalid amount' };
     }
 
-    const MIN_WITHDRAWAL = 5;
-
-    if(body.amount < MIN_WITHDRAWAL){
-        throw new Error(`Min Withdrawal is ${MIN_WITHDRAWAL} USDC`);
+    // Validate destination address (basic Solana pubkey check)
+    if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(body.destinationAddress)) {
+      return { success: false, error: 'Invalid Solana address' };
     }
 
-    await prisma.$transaction(async(tx)=>{
-        // Get current balance 
+    try {
+      // Check balance
+      const balance = await balanceService.getBalance(user.userId, body.asset);
 
-        const ledger = await tx.ledger.findUnique({
-            where :{
-                userId_asset:{
-                    userId : user.userId,
-                    asset : body.asset || 'USDC'
-                }
-            }
-        });
+      if (balance.available < body.amount) {
+        return {
+          success: false,
+          error: 'Insufficient balance',
+        };
+      }
 
-        if(!ledger || Number(ledger.available)<body.amount){
-            throw new Error("Insufficient Balance");
-        }
-
-        // Update Reserve Fund 
+      // Create withdrawal request in database
+      const withdrawal = await prisma.$transaction(async (tx) => {
+        // Reserve the amount
         await tx.ledger.update({
-            where: {
-              userId_asset: {
-                userId: user.userId,
-                asset: body.asset || 'USDC',
-              },
+          where: {
+            userId_asset: {
+              userId: user.userId,
+              asset: body.asset,
             },
-            data: {
-              available: { decrement: body.amount },
-              reserved: { increment: body.amount },
+          },
+          data: {
+            available: {
+              decrement: body.amount,
             },
+            reserved: {
+              increment: body.amount,
+            },
+          },
         });
-        // Create Withdrawal record 
 
-        const withdrawal = await tx.withdrawal.create({
-            data :{
-                userId : user.userId,
-                asset : body.asset || 'USDC',
-                amount : body.amount,
-                destinationAddress : body.destinationAddress,
-                status : 'PENDING',
-                requestedAt : new Date(),
-            }
-        })
-
-        await balanceService.invalidateCache(user.userId, body.asset || 'USDC');
-        console.log(`💸 Withdrawal requested: ${user.userId} → ${body.amount} ${body.asset || 'USDC'}`);
-
-        await redis.lpush('withdrawal:queue', JSON.stringify({
-            withdrawalId: withdrawal.id,
+        // Create withdrawal record
+        return await tx.withdrawal.create({
+          data: {
             userId: user.userId,
+            asset: body.asset,
             amount: body.amount,
-            asset: body.asset || 'USDC',
             destinationAddress: body.destinationAddress,
-        }));
+            status: 'PENDING',
+          },
+        });
+      });
+
+      console.log(`✅ Withdrawal created: ${withdrawal.id}`);
+
+      return {
+        success: true,
+        data: {
+          withdrawalId: withdrawal.id,
+          asset: withdrawal.asset,
+          amount: withdrawal.amount,
+          destinationAddress: withdrawal.destinationAddress,
+          status: withdrawal.status,
+          requestedAt: withdrawal.requestedAt,
+        },
+      };
+    } catch (error) {
+      console.error('❌ Withdrawal creation failed:', error);
+      return {
+        success: false,
+        error: 'Failed to create withdrawal',
+      };
+    }
+  }, {
+    body: t.Object({
+      asset: t.String(),
+      amount: t.Number(),
+      destinationAddress: t.String(),
+    }),
+  })
+
+  /**
+   * GET /withdrawals
+   * Get user's withdrawal history
+   */
+  .get('/', async ({ user }) => {
+
+    if(!user){
+        throw new AppError('Unauthorized', 401, 'UNAUTHORIZED');
+    }
+    const withdrawals = await prisma.withdrawal.findMany({
+      where: {
+        userId: user.userId,
+      },
+      orderBy: {
+        requestedAt: 'desc',
+      },
+      take: 50,
     });
 
-
     return {
-        success : true,
-        message : "withdrawal requested sucessfully Processing typically"
+      success: true,
+      data: withdrawals,
     };
-},{
-    body : t.Object({
-        amount : t.Number({minimum : 5}),
-        destinationAddress : t.String(),
-        asset : t.Optional(t.String())
-    }),
-})
+  })
 
-
-.get('/',async({user,query})=>{
-    if(!user){
-        throw new AppError('Unauthorized', 401, 'UNAUTHORIZED');
-    }
-    const withdrawal = await balanceService.getWithdrawalHistory(user?.userId,{
-        status : query.status,
-        limit : query.limit,
-        offset : query.offset
-    })
-
-    return {
-        success : true ,
-        ...withdrawal
-    };
-},{
-    query : t.Object({
-        status : t.Optional(t.Union([
-            t.Literal('PENDING'),
-            t.Literal('PROCESSING'),
-            t.Literal('CONFIRMED'),
-            t.Literal('FAILED')
-        ])),
-        limit: t.Optional(t.Number({ minimum: 1, maximum: 100 })),
-        offset: t.Optional(t.Number({ minimum: 0 })),
-    })
-})
-
- /**
+  /**
    * GET /withdrawals/:id
-   * Get specific withdrawal details
+   * Get withdrawal details
    */
- .get('/:id', async ({ user, params }) => {
+  .get('/:id', async ({ user, params }) => {
+
     if(!user){
         throw new AppError('Unauthorized', 401, 'UNAUTHORIZED');
     }
-    
     const withdrawal = await prisma.withdrawal.findFirst({
       where: {
         id: params.id,
         userId: user.userId,
       },
     });
-    
+
     if (!withdrawal) {
-      throw new Error('Withdrawal not found');
+      return { success: false, error: 'Withdrawal not found' };
     }
-    
+
     return {
       success: true,
-      data: {
-        id: withdrawal.id,
-        asset: withdrawal.asset,
-        amount: Number(withdrawal.amount),
-        destinationAddress: withdrawal.destinationAddress,
-        txHash: withdrawal.txHash,
-        status: withdrawal.status,
-        requestedAt: withdrawal.requestedAt,
-        processedAt: withdrawal.processedAt,
-        failureReason: withdrawal.failureReason,
-      },
+      data: withdrawal,
     };
   });

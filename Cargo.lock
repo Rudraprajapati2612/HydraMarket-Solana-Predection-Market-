@@ -7711,6 +7711,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "withdrawal-worker"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bs58",
+ "chrono",
+ "dotenv",
+ "rust_decimal",
+ "serde",
+ "serde_json",
+ "solana-client",
+ "solana-sdk",
+ "spl-associated-token-account",
+ "spl-token 6.0.0",
+ "tokio",
+ "tokio-postgres",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "writeable"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
