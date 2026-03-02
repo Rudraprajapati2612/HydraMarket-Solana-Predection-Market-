@@ -1,7 +1,7 @@
-
 import { Elysia } from "elysia";
 import jwt from "@elysiajs/jwt";
 import bearer from "@elysiajs/bearer";
+import { prisma } from "db/client";
 import { AppError } from "../types";
 
 export const authPlugin = () => {
@@ -21,12 +21,27 @@ export const authPlugin = () => {
           const payload = await jwt.verify(bearer);
           if (!payload) return { user: null };
 
+          // ✅ Fetch fresh user from DB
+          const dbUser = await prisma.user.findUnique({
+            where: { id: payload.userId as string },
+            select: {
+              id: true,
+              email: true,
+              username: true,
+              role: true,
+              walletAddress: true, // ✅ ADD THIS
+            },
+          });
+
+          if (!dbUser) return { user: null };
+
           return {
             user: {
-              userId: payload.userId as string,
-              email: payload.email as string,
-              username: payload.username as string,
-              role: payload.role as string, // ✅ ADD THIS
+              userId: dbUser.id,
+              email: dbUser.email,
+              username: dbUser.username,
+              role: dbUser.role,
+              walletAddress: dbUser.walletAddress, // ✅ NOW AVAILABLE
             },
           };
         } catch (e) {
@@ -43,14 +58,13 @@ export const authPlugin = () => {
             }
           });
         },
-        // ✅ ADD NEW MACRO FOR ADMIN CHECK
         isAdmin(enabled: boolean) {
           if (!enabled) return;
           onBeforeHandle(({ user }: any) => {
             if (!user) {
               throw new AppError("Unauthorized", 401, "UNAUTHORIZED");
             }
-            if (user.role !== 'ADMIN' && user.role !== 'SUPERADMIN') {
+            if (user.role !== "ADMIN" && user.role !== "SUPERADMIN") {
               throw new AppError(
                 "Forbidden: Admin access required",
                 403,

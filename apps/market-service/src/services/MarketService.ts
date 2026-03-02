@@ -90,7 +90,11 @@ export class MarketService {
     // Generate accounts
     const yesTokenMint = Keypair.generate();
     const noTokenMint = Keypair.generate();
-    const resolutionAdapter = Keypair.generate();
+    const resolutionAdapterKeypair = Keypair.generate();  
+    
+    const resolutionAdapterKey = bs58.encode(
+      resolutionAdapterKeypair.secretKey
+    );
 
     const marketId = randomBytes(32);
 
@@ -111,7 +115,7 @@ export class MarketService {
     console.log("Escrow Vault:", escrowVaultPda.toBase58());
     console.log("YES Mint:", yesTokenMint.publicKey.toBase58());
     console.log("NO Mint:", noTokenMint.publicKey.toBase58());
-
+    
     try {
       // ✅ Call Anchor instruction with proper BN
       const tx = await this.marketProgram.methods
@@ -131,7 +135,7 @@ export class MarketService {
           noTokenMint: noTokenMint.publicKey,
           escrowVault: escrowVaultPda,
           escrowProgram: this.escrowProgram.programId,
-          resolutionAdapter: resolutionAdapter.publicKey,
+          resolutionAdapter: resolutionAdapterKeypair.publicKey,
           systemProgram: SystemProgram.programId,
           tokenProgram: TOKEN_PROGRAM_ID,
           rent: web3.SYSVAR_RENT_PUBKEY,
@@ -171,6 +175,8 @@ export class MarketService {
           escrowVaultPda: escrowVaultPda.toBase58(),
           yesTokenMint: yesTokenMint.publicKey.toBase58(),
           noTokenMint: noTokenMint.publicKey.toBase58(),
+          resolutionAdapter: resolutionAdapterKeypair.publicKey.toBase58(),
+          resolutionAdapterKey: resolutionAdapterKey,
           state: "OPEN",
           expiresAt: params.expiresAt,
         },

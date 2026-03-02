@@ -8,7 +8,8 @@
     "autocannon": "^8.0.0"
   },
   "scripts": {
-    "dev": "bun run --watch src/index.ts"
+    "dev": "bun run --watch src/index.ts",
+    "settle": "bun run src/scripts/settle-market.ts"
   },
   "peerDependencies": {
     "typescript": "^5",

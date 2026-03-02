@@ -374,4 +374,3 @@ async getOrderbook(marketId: string, outcome: 'YES' | 'NO') {
     });
 }
 }
-

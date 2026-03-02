@@ -102,7 +102,7 @@ impl Database {
         Ok(withdrawals)
     }
 
-    /// Mark withdrawal as CONFIRMED and release the reserved balance
+    /// Mark withdrawal as CONFIRMED and reilease the reserved balance
     /// in a SINGLE atomic transaction to prevent partial updates.
     async fn confirm_withdrawal(
         &self,

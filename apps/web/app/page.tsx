@@ -1,102 +1,104 @@
-import Image, { type ImageProps } from "next/image";
-import { Button } from "@repo/ui/button";
-import styles from "./page.module.css";
+'use client';
 
-type Props = Omit<ImageProps, "src"> & {
-  srcLight: string;
-  srcDark: string;
-};
+import { useEffect, useState } from 'react';
+import { useWallet } from '@solana/wallet-adapter-react';
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
+import ClaimButton from './components/ClaimButton';
 
-const ThemeImage = (props: Props) => {
-  const { srcLight, srcDark, ...rest } = props;
+const API_BASE = 'http://localhost:3000';
 
-  return (
-    <>
-      <Image {...rest} src={srcLight} className="imgLight" />
-      <Image {...rest} src={srcDark} className="imgDark" />
-    </>
-  );
-};
+async function saveWalletToDb(walletAddress: string) {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    console.warn('⚠️ No token in localStorage — user not logged in');
+    return false;
+  }
+
+  const res = await fetch(`${API_BASE}/users/wallet`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type':  'application/json',
+    },
+    body: JSON.stringify({ walletAddress }),
+  });
+
+  const data = await res.json();
+  if (data.success) {
+    console.log('✅ Wallet saved to DB:', walletAddress);
+    return true;
+  } else {
+    console.error('❌ Failed to save wallet:', data.error);
+    return false;
+  }
+}
 
 export default function Home() {
-  return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <ThemeImage
-          className={styles.logo}
-          srcLight="turborepo-dark.svg"
-          srcDark="turborepo-light.svg"
-          alt="Turborepo logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol>
-          <li>
-            Get started by editing <code>apps/web/app/page.tsx</code>
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const { publicKey, connected } = useWallet();
+  const [walletStatus, setWalletStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new/clone?demo-description=Learn+to+implement+a+monorepo+with+a+two+Next.js+sites+that+has+installed+three+local+packages.&demo-image=%2F%2Fimages.ctfassets.net%2Fe5382hct74si%2F4K8ZISWAzJ8X1504ca0zmC%2F0b21a1c6246add355e55816278ef54bc%2FBasic.png&demo-title=Monorepo+with+Turborepo&demo-url=https%3A%2F%2Fexamples-basic-web.vercel.sh%2F&from=templates&project-name=Monorepo+with+Turborepo&repository-name=monorepo-turborepo&repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fturborepo%2Ftree%2Fmain%2Fexamples%2Fbasic&root-directory=apps%2Fdocs&skippable-integrations=1&teamSlug=vercel&utm_source=create-turbo"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            href="https://turborepo.dev/docs?utm_source"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.secondary}
-          >
-            Read our docs
-          </a>
+  // Check login status on mount
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    setIsLoggedIn(!!token);
+  }, []);
+
+  // Save wallet whenever BOTH conditions are true:
+  //   1. Wallet is connected
+  //   2. User is logged in (token exists)
+  // This handles both orderings: login-first or connect-first
+  useEffect(() => {
+    if (!connected || !publicKey || !isLoggedIn) return;
+
+    setWalletStatus('saving');
+
+    saveWalletToDb(publicKey.toBase58())
+      .then(success => setWalletStatus(success ? 'saved' : 'error'))
+      .catch(() => setWalletStatus('error'));
+
+  }, [connected, publicKey, isLoggedIn]);
+
+  return (
+    <div style={{ padding: 40, fontFamily: 'sans-serif' }}>
+      <h1>HydraMarket</h1>
+
+      {/* Login status */}
+      {!isLoggedIn && (
+        <div style={{ marginBottom: 16, padding: 12, background: '#fef3c7', borderRadius: 8 }}>
+          ⚠️ <a href="/login">Login first</a> before connecting your wallet
         </div>
-        <Button appName="web" className={styles.secondary}>
-          Open alert
-        </Button>
-      </main>
-      <footer className={styles.footer}>
-        <a
-          href="https://vercel.com/templates?search=turborepo&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          href="https://turborepo.dev?utm_source=create-turbo"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to turborepo.dev →
-        </a>
-      </footer>
+      )}
+
+      {/* Wallet connect */}
+      <WalletMultiButton />
+
+      {/* Wallet status feedback */}
+      {connected && publicKey && (
+        <p style={{ marginTop: 8, fontSize: 14 }}>
+          {walletStatus === 'saving' && '⏳ Saving wallet address...'}
+          {walletStatus === 'saved'  && '✅ Wallet linked to your account'}
+          {walletStatus === 'error'  && '❌ Failed to link wallet — are you logged in?'}
+          {walletStatus === 'idle'   && `Connected: ${publicKey.toBase58().slice(0,8)}...`}
+        </p>
+      )}
+
+      <hr style={{ margin: '24px 0' }} />
+
+      <h2>Open Positions</h2>
+
+      {/* Only show claim button if wallet is linked */}
+      {walletStatus !== 'saved' && connected && (
+        <p style={{ color: '#ef4444' }}>
+          Wallet must be linked before claiming. 
+          {walletStatus === 'error' ? ' Please login and refresh.' : ''}
+        </p>
+      )}
+
+      <ClaimButton
+        marketId="e3ccfcca-8c83-4fdb-bcbd-8a1bfde57d0c"
+        disabled={walletStatus !== 'saved'}
+      />
     </div>
   );
 }
