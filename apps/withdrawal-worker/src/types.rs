@@ -1,4 +1,4 @@
-use chrono::{Date, DateTime, Utc};
+use chrono::NaiveDateTime;
 
 
 #[derive(Debug,Clone)]
@@ -10,7 +10,7 @@ pub struct Withdrawal{
     pub amount : String,
     pub destination_address : String,
     pub status : WithdrawalStatus,
-    pub requested_at : DateTime<Utc>
+    pub requested_at : NaiveDateTime
 }
 
 #[derive(Debug,Clone)]

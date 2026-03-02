@@ -378,7 +378,7 @@ impl WithdrawalProcessor {
     fn get_token_mint(&self, asset: &str) -> Result<Pubkey> {
         match asset {
             "USDC" => Ok(Pubkey::from_str(
-                "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+                "Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr",
             )?),
             // Add YES/NO mints here when looked up from market/DB
             _ => Err(anyhow::anyhow!("Unknown asset: {}", asset)),
