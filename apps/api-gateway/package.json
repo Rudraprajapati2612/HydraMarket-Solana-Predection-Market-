@@ -29,6 +29,7 @@
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.2.3",
     "elysia": "^1.4.22",
+    "eventsource": "^4.1.0",
     "ioredis": "^5.9.2",
     "market-service": "*",
     "order-service": "*",
