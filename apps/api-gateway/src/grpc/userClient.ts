@@ -50,6 +50,7 @@ const USER_SERVICE_URL = process.env.USER_SERVICE_GRPC || 'localhost:50051';
         username: data.username,
         password: data.password,
         fullName: data.fullName, 
+        
       }),
   
     login: (data: { email: string; password: string }) =>

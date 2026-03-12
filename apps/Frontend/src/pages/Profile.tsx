@@ -3,12 +3,15 @@ import { useNavigate } from "react-router-dom";
 import { Sidebar } from "../components/Sidebar";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "react-hot-toast";
+import { API_BASE_URL } from "../lib/api";
+import { clearSessionUser, getStoredSessionUser, persistSessionUser } from "../lib/session";
 
 interface UserProfile {
   userId: string;
   username: string;
   email: string;
   fullName: string | null;
+  role?: string;
   depositeMemo: string;
   createdAt: string;
 }
@@ -44,15 +47,41 @@ export const Profile = () => {
     setLoading(true);
     setError(false);
     try {
-      // Simulate API call GET /auth/me
-      await new Promise(resolve => setTimeout(resolve, 1200));
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        navigate("/login");
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/auth/me`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.message || data?.error || "PROFILE_FETCH_FAILED");
+      }
+
       setProfile({
-        userId: "usr_abc123",
-        username: "JohnDoe",
-        email: "john@example.com",
-        fullName: "John Doe",
-        depositeMemo: "DEP-ABC123",
-        createdAt: "2026-01-15T10:00:00Z"
+        userId: data.data.userId,
+        username: data.data.username,
+        email: data.data.email,
+        fullName: data.data.fullName || null,
+        role: data.data.role,
+        depositeMemo: data.data.depositeMemo || getStoredSessionUser().depositeMemo || "NOT_AVAILABLE",
+        createdAt: data.data.createdAt,
+      });
+
+      persistSessionUser({
+        userId: data.data.userId,
+        username: data.data.username,
+        email: data.data.email,
+        role: data.data.role,
+        depositeMemo: data.data.depositeMemo,
       });
     } catch (err) {
       setError(true);
@@ -400,11 +429,7 @@ export const Profile = () => {
                   <div className="pt-6">
                     <button 
                       onClick={() => {
-                        localStorage.removeItem('token');
-                        localStorage.removeItem('userRole');
-                        localStorage.removeItem('username');
-                        localStorage.removeItem('email');
-                        localStorage.removeItem('userId');
+                        clearSessionUser();
                         navigate('/login');
                       }}
                       className="px-4 py-2 border border-pro-red/30 text-pro-red text-[10px] font-bold uppercase tracking-widest hover:bg-pro-red/10 transition-all"

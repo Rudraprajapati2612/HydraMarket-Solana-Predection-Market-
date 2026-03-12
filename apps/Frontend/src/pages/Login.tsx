@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { Sun, Moon } from "lucide-react";
 import { motion } from "motion/react";
 import { API_BASE_URL } from "../lib/api";
+import { persistSessionUser } from "../lib/session";
 
 export const Login = () => {
   const [isDarkMode, setIsDarkMode] = useState(true);
@@ -69,10 +70,13 @@ export const Login = () => {
       const role = data.data.role;
 
       localStorage.setItem("token", data.data.token);
-      localStorage.setItem("userRole", role);
-      localStorage.setItem("username", data.data.username);
-      localStorage.setItem("email", data.data.email);
-      localStorage.setItem("userId", data.data.userId);
+      persistSessionUser({
+        userId: data.data.userId,
+        username: data.data.username,
+        email: data.data.email,
+        role,
+        depositeMemo: data.data.depositeMemo,
+      });
 
       navigate(role === "ADMIN" || role === "SUPERADMIN" ? "/admin" : "/dashboard");
     } catch (err: any) {

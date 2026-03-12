@@ -91,6 +91,7 @@ export const authRoutes = new Elysia({ prefix: '/auth' })
           username: response.username,
           role: response.role,
           walletAddress: response.wallet_address,
+          depositeMemo: response.deposite_memo,
           token: response.token
         },
       };
@@ -115,7 +116,7 @@ export const authRoutes = new Elysia({ prefix: '/auth' })
   // GET /auth/me (RATE LIMITED) 
   .get('/me', async ({ user, request,server }) => {
     // Check rate limit using the request object directly
-    await checkRateLimit(request, 5, 60,server);
+    // await checkRateLimit(request, 5, 60,server);
 
     if (!user) {
       throw new AppError('Unauthorized', 401, 'UNAUTHORIZED');
@@ -131,7 +132,9 @@ export const authRoutes = new Elysia({ prefix: '/auth' })
           email: userData.email,
           username: userData.username,
           fullName: userData.full_name,
+          role: userData.role,
           walletAddress: userData.wallet_address,
+          depositeMemo: userData.deposite_memo,
           createdAt: userData.created_at,
         },
       };

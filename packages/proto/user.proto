@@ -73,8 +73,9 @@ message GetUserResponse {
   string email = 2;
   string username = 3;
   string full_name = 4;
-  string deposite_address = 5;
-  string deposite_memo =6;
-  bool is_active = 7;
-  string created_at = 8;
+  string role = 5;              // ADD THIS
+  string deposite_address = 6;
+  string deposite_memo = 7;
+  bool is_active = 8;
+  string created_at = 9;
 }

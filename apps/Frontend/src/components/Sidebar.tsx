@@ -1,5 +1,7 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { API_BASE_URL } from "../lib/api";
+import { getStoredSessionUser, persistSessionUser } from "../lib/session";
 
 interface SidebarProps {
   isDark: boolean;
@@ -10,7 +12,8 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ isDark, isSidebarOpen, setIsSidebarOpen }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const userRole = localStorage.getItem("userRole") || "USER";
+  const [sessionUser, setSessionUser] = useState(() => getStoredSessionUser());
+  const userRole = sessionUser.role || "USER";
   const isAdmin = userRole === "ADMIN" || userRole === "SUPERADMIN";
 
   const isActive = (path: string) => location.pathname === path;
@@ -33,7 +36,47 @@ export const Sidebar: React.FC<SidebarProps> = ({ isDark, isSidebarOpen, setIsSi
     return colors[Math.abs(hash) % colors.length];
   };
 
-  const username = localStorage.getItem("username") || "USER_77491";
+  const username = sessionUser.username || "USER";
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      setSessionUser(getStoredSessionUser());
+      return;
+    }
+
+    const syncUser = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/auth/me`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data?.success) {
+          return;
+        }
+
+        const nextUser = {
+          userId: data.data.userId,
+          username: data.data.username,
+          email: data.data.email,
+          role: data.data.role,
+          depositeMemo: data.data.depositeMemo,
+        };
+
+        persistSessionUser(nextUser);
+        setSessionUser(getStoredSessionUser());
+      } catch (error) {
+        setSessionUser(getStoredSessionUser());
+      }
+    };
+
+    syncUser();
+  }, [location.pathname]);
 
   const NavButton = ({ path, icon, label, active = false }: { path: string; icon: string; label: string; active?: boolean }) => (
     <button 

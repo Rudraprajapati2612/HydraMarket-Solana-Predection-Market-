@@ -14,6 +14,7 @@ import { orderRoutes } from "./routes/orders";
 import { payoutRoutes } from "./routes/payout";
 import {walletRoutes} from "./routes/wallet"
 import { portfolioRoutes } from "./routes/portfolio";
+import { dashboardRoutes } from "./routes/dashboard";
 const PORT = parseInt(process.env.PORT || '3000');
 
 const app = new Elysia()
@@ -60,6 +61,7 @@ const app = new Elysia()
   .use(orderRoutes)
   .use(walletRoutes)
   .use(portfolioRoutes)
+  .use(dashboardRoutes)
   .onError(({ code, error, set }) => {
     console.error('Error:', error);
 

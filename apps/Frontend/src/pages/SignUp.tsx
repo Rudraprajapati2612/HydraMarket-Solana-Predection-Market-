@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Terminal, Settings, Sun, Moon } from "lucide-react";
 import { motion } from "motion/react";
+import { API_BASE_URL } from "../lib/api";
+import { persistSessionUser } from "../lib/session";
 
 export const SignUp = () => {
   const [isDarkMode, setIsDarkMode] = useState(true);
@@ -11,6 +13,7 @@ export const SignUp = () => {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [showPasscode, setShowPasscode] = useState(false);
+  const [error, setError] = useState("");
 
   const getSecurityLevel = (pass: string) => {
     if (!pass) return { label: "NO_INPUT", color: "text-gray-500", bar: 0 };
@@ -42,9 +45,10 @@ export const SignUp = () => {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
   
     try {
-      const res = await fetch("http://localhost:3000/auth/register", {
+      const res = await fetch(`${API_BASE_URL}/auth/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -59,14 +63,22 @@ export const SignUp = () => {
   
       const data = await res.json();
   
-      if (data.success) {
+      if (res.ok && data.success) {
         localStorage.setItem("token", data.data.token);
+        persistSessionUser({
+          userId: data.data.userId,
+          username: data.data.username,
+          email: data.data.email,
+          role: data.data.role,
+          depositeMemo: data.data.depositememo,
+        });
         navigate("/dashboard");
       } else {
-        alert("Registration failed");
+        setError(data?.message || data?.error || "Registration failed");
       }
     } catch (err) {
       console.error(err);
+      setError("Unable to register");
     }
   };
 
@@ -147,6 +159,12 @@ export const SignUp = () => {
                   {isDarkMode && <div className="absolute right-0 top-0 bottom-0 w-1 bg-neon-blue opacity-0 group-hover:opacity-100 transition-opacity"></div>}
                 </div>
               </div>
+
+              {error && (
+                <div className={`text-[11px] font-mono uppercase tracking-wide ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>
+                  {error}
+                </div>
+              )}
 
               <div className="space-y-2 group">
                 <label className={`block text-xs font-code uppercase tracking-wider transition-colors duration-300 ${isDarkMode ? 'text-neon-blue/80 group-hover:text-neon-blue' : 'text-gray-600 group-hover:text-blue-600'}`}>
