@@ -1,24 +1,27 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Sidebar } from "../components/Sidebar";
 import { motion } from "framer-motion";
 import { toast } from "react-hot-toast";
+import { API_BASE_URL } from "../lib/api";
+import { clearSessionUser } from "../lib/session";
 
 interface ClaimablePayout {
-  id: string;
   marketId: string;
-  question: string;
-  outcome: "YES" | "NO";
-  tokens: number;
+  marketQuestion: string;
+  outcome: "YES" | "NO" | "INVALID";
+  yesTokens: number;
+  noTokens: number;
   payout: number;
 }
 
 interface ClaimHistory {
   id: string;
-  date: string;
-  market: string;
-  outcome: "YES" | "NO";
+  marketId: string;
+  marketQuestion: string;
+  outcome: "YES" | "NO" | "INVALID" | null;
   amount: number;
-  tx: string;
+  claimedAt: string;
+  txSignature?: string | null;
 }
 
 export const Payouts = () => {
@@ -27,36 +30,151 @@ export const Payouts = () => {
   const [claimHistory, setClaimHistory] = useState<ClaimHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState("00:00:00");
-
+  const [claimingMarketId, setClaimingMarketId] = useState<string | null>(null);
+  const [claimingAll, setClaimingAll] = useState(false);
+  const [error, setError] = useState("");
   const isDark = true;
+
+  const fetchPayouts = async () => {
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      clearSessionUser();
+      window.location.href = "/login";
+      return;
+    }
+
+    try {
+      setError("");
+      const headers = { Authorization: `Bearer ${token}` };
+      const [claimableResponse, historyResponse] = await Promise.all([
+        fetch(`${API_BASE_URL}/payouts/claimable`, { headers }),
+        fetch(`${API_BASE_URL}/payouts/history`, { headers }),
+      ]);
+
+      if (claimableResponse.status === 401 || historyResponse.status === 401) {
+        clearSessionUser();
+        window.location.href = "/login";
+        return;
+      }
+
+      const [claimableData, historyData] = await Promise.all([
+        claimableResponse.json(),
+        historyResponse.json(),
+      ]);
+
+      if (!claimableResponse.ok || !claimableData?.success) {
+        throw new Error(claimableData?.error || "Failed to load claimable payouts");
+      }
+
+      if (!historyResponse.ok || !historyData?.success) {
+        throw new Error(historyData?.error || "Failed to load payout history");
+      }
+
+      setClaimablePayouts(claimableData.data);
+      setClaimHistory(historyData.data);
+    } catch (fetchError: any) {
+      setError(fetchError.message || "Failed to load payouts");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     const timer = setInterval(() => {
       const now = new Date();
-      setCurrentTime(now.toISOString().split('T')[1].split('.')[0]);
+      setCurrentTime(now.toISOString().split("T")[1].split(".")[0]);
     }, 1000);
-    
-    // Simulate data fetch
-    setTimeout(() => {
-      setLoading(false);
-    }, 800);
+
+    fetchPayouts();
 
     return () => clearInterval(timer);
   }, []);
 
-  const handleClaim = (id: string) => {
-    toast.success(`CLAIM_EXECUTED: ${id}`, {
-      style: { background: '#1a1a1a', color: '#fff', border: '1px solid #333', fontFamily: 'monospace' }
-    });
+  const handleClaim = async (marketId: string) => {
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      clearSessionUser();
+      window.location.href = "/login";
+      return;
+    }
+
+    setClaimingMarketId(marketId);
+    try {
+      const response = await fetch(`${API_BASE_URL}/payouts/claim/${marketId}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+
+      if (response.status === 401) {
+        clearSessionUser();
+        window.location.href = "/login";
+        return;
+      }
+
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.error || "CLAIM_FAILED");
+      }
+
+      toast.success(`CLAIM_EXECUTED: ${marketId}`, {
+        style: { background: "#1a1a1a", color: "#fff", border: "1px solid #333", fontFamily: "monospace" },
+      });
+      await fetchPayouts();
+    } catch (claimError: any) {
+      toast.error(claimError.message || "CLAIM_FAILED");
+    } finally {
+      setClaimingMarketId(null);
+    }
   };
 
-  const handleClaimAll = () => {
-    toast.success("ALL_CLAIMS_EXECUTED", {
-      style: { background: '#1a1a1a', color: '#fff', border: '1px solid #333', fontFamily: 'monospace' }
-    });
+  const handleClaimAll = async () => {
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      clearSessionUser();
+      window.location.href = "/login";
+      return;
+    }
+
+    setClaimingAll(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/payouts/claim-all`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+
+      if (response.status === 401) {
+        clearSessionUser();
+        window.location.href = "/login";
+        return;
+      }
+
+      if (!response.ok || !data?.data) {
+        throw new Error(data?.error || "CLAIM_ALL_FAILED");
+      }
+
+      toast.success(`ALL_CLAIMS_EXECUTED: ${data.data.claimedCount}`, {
+        style: { background: "#1a1a1a", color: "#fff", border: "1px solid #333", fontFamily: "monospace" },
+      });
+      await fetchPayouts();
+    } catch (claimAllError: any) {
+      toast.error(claimAllError.message || "CLAIM_ALL_FAILED");
+    } finally {
+      setClaimingAll(false);
+    }
   };
 
-  const totalClaimable = claimablePayouts.reduce((acc, curr) => acc + curr.payout, 0);
+  const totalClaimable = useMemo(
+    () => claimablePayouts.reduce((total, payout) => total + payout.payout, 0),
+    [claimablePayouts],
+  );
 
   return (
     <div className="bg-bg-dark text-text-light font-mono antialiased overflow-hidden h-screen flex flex-col relative">
@@ -64,16 +182,11 @@ export const Payouts = () => {
         <Sidebar isDark={isDark} isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
 
         <main className="flex-1 flex flex-col min-w-0 bg-bg-dark relative overflow-hidden">
-          {/* Grid Background */}
           <div className="absolute inset-0 grid-dark grid-bg pointer-events-none opacity-20"></div>
 
-          {/* Header */}
           <header className="h-16 border-b border-border-dark bg-bg-dark/90 backdrop-blur-sm sticky top-0 z-30 flex items-center justify-between px-4 md:px-8 shrink-0">
             <div className="flex items-center gap-4">
-              <button
-                className="lg:hidden text-text-muted hover:text-cyber-blue transition-colors"
-                onClick={() => setIsSidebarOpen(true)}
-              >
+              <button className="lg:hidden text-text-muted hover:text-cyber-blue transition-colors" onClick={() => setIsSidebarOpen(true)}>
                 <span className="material-symbols-outlined">menu</span>
               </button>
               <h1 className="text-sm md:text-lg font-code font-bold text-text-light tracking-tight uppercase flex items-center gap-1">
@@ -91,12 +204,13 @@ export const Payouts = () => {
           </header>
 
           <div className="flex-1 overflow-y-auto p-4 md:p-8 relative z-10 space-y-8">
-            {/* Claimable Payouts Section */}
-            <motion.section 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-card-dark border border-border-dark overflow-hidden"
-            >
+            {error ? (
+              <div className="border border-pro-red/40 bg-pro-red/10 text-pro-red px-4 py-3 text-[11px] uppercase tracking-widest">
+                {error}
+              </div>
+            ) : null}
+
+            <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-card-dark border border-border-dark overflow-hidden">
               <div className="p-4 border-b border-border-dark bg-white/[0.02] flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <span className="text-cyber-blue font-bold">&gt;</span>
@@ -106,14 +220,11 @@ export const Payouts = () => {
                   <div className="text-[10px] font-bold uppercase tracking-widest">
                     TOTAL: <span className="text-cyber-blue">${totalClaimable.toFixed(2)}</span>
                   </div>
-                  {claimablePayouts.length > 0 && (
-                    <button 
-                      onClick={handleClaimAll}
-                      className="px-4 py-1.5 bg-amber-500 text-black text-[10px] font-bold uppercase tracking-widest hover:bg-amber-400 transition-colors shadow-[0_0_10px_rgba(245,158,11,0.3)]"
-                    >
-                      [CLAIM_ALL]
+                  {claimablePayouts.length > 0 ? (
+                    <button onClick={handleClaimAll} disabled={claimingAll} className="px-4 py-1.5 bg-amber-500 text-black text-[10px] font-bold uppercase tracking-widest hover:bg-amber-400 transition-colors shadow-[0_0_10px_rgba(245,158,11,0.3)] disabled:opacity-50">
+                      {claimingAll ? "[CLAIMING...]" : "[CLAIM_ALL]"}
                     </button>
-                  )}
+                  ) : null}
                 </div>
               </div>
 
@@ -131,29 +242,26 @@ export const Payouts = () => {
                   </thead>
                   <tbody className="text-[11px] font-mono">
                     {loading ? (
-                      Array(3).fill(0).map((_, i) => (
-                        <tr key={i} className="border-b border-border-dark/30 animate-pulse">
+                      Array.from({ length: 3 }).map((_, index) => (
+                        <tr key={index} className="border-b border-border-dark/30 animate-pulse">
                           <td colSpan={6} className="px-6 py-4 h-12 bg-white/[0.01]"></td>
                         </tr>
                       ))
                     ) : claimablePayouts.length > 0 ? (
                       claimablePayouts.map((payout) => (
-                        <tr key={payout.id} className="border-b border-border-dark/30 hover:bg-white/[0.02] transition-colors group">
+                        <tr key={payout.marketId} className="border-b border-border-dark/30 hover:bg-white/[0.02] transition-colors group">
                           <td className="px-6 py-4 text-text-muted">#{payout.marketId}</td>
-                          <td className="px-6 py-4 text-text-light max-w-xs truncate">{payout.question}</td>
+                          <td className="px-6 py-4 text-text-light max-w-xs truncate">{payout.marketQuestion}</td>
                           <td className="px-6 py-4">
-                            <span className={`px-2 py-0.5 rounded-sm text-[9px] font-bold ${payout.outcome === 'YES' ? 'bg-pro-green/10 text-pro-green border border-pro-green/20' : 'bg-pro-red/10 text-pro-red border border-pro-red/20'}`}>
+                            <span className={`px-2 py-0.5 rounded-sm text-[9px] font-bold ${payout.outcome === "YES" ? "bg-pro-green/10 text-pro-green border border-pro-green/20" : "bg-pro-red/10 text-pro-red border border-pro-red/20"}`}>
                               {payout.outcome}
                             </span>
                           </td>
-                          <td className="px-6 py-4 text-text-muted">{payout.tokens}</td>
+                          <td className="px-6 py-4 text-text-muted">{(payout.outcome === "YES" ? payout.yesTokens : payout.outcome === "NO" ? payout.noTokens : payout.yesTokens + payout.noTokens).toFixed(2)}</td>
                           <td className="px-6 py-4 text-cyber-blue font-bold">${payout.payout.toFixed(2)}</td>
                           <td className="px-6 py-4 text-right">
-                            <button 
-                              onClick={() => handleClaim(payout.id)}
-                              className="px-3 py-1 border border-amber-500/50 text-amber-500 text-[9px] font-bold uppercase tracking-widest hover:bg-amber-500 hover:text-black transition-all"
-                            >
-                              [EXECUTE_CLAIM]
+                            <button onClick={() => handleClaim(payout.marketId)} disabled={claimingMarketId === payout.marketId} className="px-3 py-1 border border-amber-500/50 text-amber-500 text-[9px] font-bold uppercase tracking-widest hover:bg-amber-500 hover:text-black transition-all disabled:opacity-50">
+                              {claimingMarketId === payout.marketId ? "[CLAIMING...]" : "[EXECUTE_CLAIM]"}
                             </button>
                           </td>
                         </tr>
@@ -173,13 +281,7 @@ export const Payouts = () => {
               </div>
             </motion.section>
 
-            {/* Claim History Section */}
-            <motion.section 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="bg-card-dark border border-border-dark overflow-hidden"
-            >
+            <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-card-dark border border-border-dark overflow-hidden">
               <div className="p-4 border-b border-border-dark bg-white/[0.02]">
                 <div className="flex items-center gap-3">
                   <span className="text-cyber-blue font-bold">&gt;</span>
@@ -200,26 +302,30 @@ export const Payouts = () => {
                   </thead>
                   <tbody className="text-[11px] font-mono">
                     {loading ? (
-                      Array(3).fill(0).map((_, i) => (
-                        <tr key={i} className="border-b border-border-dark/30 animate-pulse">
+                      Array.from({ length: 3 }).map((_, index) => (
+                        <tr key={index} className="border-b border-border-dark/30 animate-pulse">
                           <td colSpan={5} className="px-6 py-4 h-12 bg-white/[0.01]"></td>
                         </tr>
                       ))
                     ) : claimHistory.length > 0 ? (
                       claimHistory.map((item) => (
                         <tr key={item.id} className="border-b border-border-dark/30 hover:bg-white/[0.02] transition-colors">
-                          <td className="px-6 py-4 text-text-muted">{item.date}</td>
-                          <td className="px-6 py-4 text-text-light max-w-xs truncate">{item.market}</td>
+                          <td className="px-6 py-4 text-text-muted">{new Date(item.claimedAt).toISOString().replace("T", " ").split(".")[0]}</td>
+                          <td className="px-6 py-4 text-text-light max-w-xs truncate">{item.marketQuestion}</td>
                           <td className="px-6 py-4">
-                            <span className={`px-2 py-0.5 rounded-sm text-[9px] font-bold ${item.outcome === 'YES' ? 'bg-pro-green/10 text-pro-green border border-pro-green/20' : 'bg-pro-red/10 text-pro-red border border-pro-red/20'}`}>
-                              {item.outcome}
+                            <span className={`px-2 py-0.5 rounded-sm text-[9px] font-bold ${item.outcome === "YES" ? "bg-pro-green/10 text-pro-green border border-pro-green/20" : "bg-pro-red/10 text-pro-red border border-pro-red/20"}`}>
+                              {item.outcome ?? "N/A"}
                             </span>
                           </td>
                           <td className="px-6 py-4 text-pro-green font-bold">+${item.amount.toFixed(2)}</td>
                           <td className="px-6 py-4">
-                            <a href={`https://solscan.io/tx/${item.tx}`} target="_blank" rel="noreferrer" className="text-cyber-blue hover:underline flex items-center gap-1">
-                              {item.tx.slice(0, 8)}... <span className="material-symbols-outlined text-[12px]">open_in_new</span>
-                            </a>
+                            {item.txSignature ? (
+                              <a href={`https://solscan.io/tx/${item.txSignature}`} target="_blank" rel="noreferrer" className="text-cyber-blue hover:underline flex items-center gap-1">
+                                {item.txSignature.slice(0, 8)}... <span className="material-symbols-outlined text-[12px]">open_in_new</span>
+                              </a>
+                            ) : (
+                              <span className="text-text-muted">N/A</span>
+                            )}
                           </td>
                         </tr>
                       ))
@@ -239,7 +345,6 @@ export const Payouts = () => {
             </motion.section>
           </div>
 
-          {/* Footer Status Bar */}
           <footer className="h-8 border-t border-border-dark bg-bg-dark/90 flex items-center justify-between px-6 text-[9px] font-mono uppercase text-text-muted/60">
             <div className="flex items-center gap-6">
               <span className="flex items-center gap-2">

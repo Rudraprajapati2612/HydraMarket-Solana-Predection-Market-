@@ -2,6 +2,8 @@ import {Elysia,t} from "elysia";
 
 import { OrderService } from "order-service/order";
 import { authPlugin } from "../plugins/auth";
+import { prisma } from "db/client";
+import { AppError } from "../types";
 const orderService = new OrderService();
 
 export const orderRoutes = new Elysia({prefix:'/orders'})
@@ -71,4 +73,63 @@ export const orderRoutes = new Elysia({prefix:'/orders'})
           success: true,
           data: orderbook,
         };
+      })
+
+      .post('/:id/cancel', async ({ user, params }) => {
+        if (!user) {
+          throw new AppError('Unauthorized', 401, 'UNAUTHORIZED');
+        }
+
+        const order = await prisma.order.findFirst({
+          where: {
+            id: params.id,
+            userId: user.userId,
+          },
+        });
+
+        if (!order) {
+          throw new AppError('Order not found', 404, 'ORDER_NOT_FOUND');
+        }
+
+        if (order.status === 'FILLED' || order.status === 'CANCELLED') {
+          throw new AppError('Order cannot be cancelled', 400, 'ORDER_NOT_CANCELLABLE');
+        }
+
+        const filledAmount = Number(order.filledQuantity) * Number(order.price);
+        const releasableAmount = Math.max(0, Number(order.amount) - filledAmount);
+
+        await prisma.$transaction(async (tx) => {
+          if (order.side === 'BUY' && releasableAmount > 0) {
+            await tx.ledger.update({
+              where: {
+                userId_asset: {
+                  userId: user.userId,
+                  asset: 'USDC',
+                },
+              },
+              data: {
+                reserved: { decrement: releasableAmount },
+                available: { increment: releasableAmount },
+              },
+            });
+          }
+
+          await tx.order.update({
+            where: { id: order.id },
+            data: { status: 'CANCELLED' },
+          });
+        });
+
+        return {
+          success: true,
+          data: {
+            orderId: order.id,
+            status: 'CANCELLED',
+            releasedAmount: releasableAmount,
+          },
+        };
+      }, {
+        params: t.Object({
+          id: t.String(),
+        }),
       });

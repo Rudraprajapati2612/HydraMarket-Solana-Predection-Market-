@@ -72,6 +72,142 @@ function parseOutcomeEnum(outcome: string) {
   }
 }
 
+async function executeClaimPayout(userId: string, marketId: string) {
+  console.log(`\n💰 Claim payout: market=${marketId} user=${userId}`);
+
+  const market = await prisma.market.findUnique({ where: { id: marketId } });
+
+  if (!market) return { success: false, error: 'Market not found' } as const;
+  if (market.state !== 'RESOLVED') return { success: false, error: 'Market not resolved yet. Admin must call POST /payouts/resolve/:marketId first.' } as const;
+  if (!market.outcome) return { success: false, error: 'Market outcome not set' } as const;
+
+  const position = await prisma.position.findUnique({
+    where: { userId_marketId: { userId, marketId } },
+  });
+
+  if (!position) return { success: false, error: 'No position found' } as const;
+  if (position.isClaimed) return { success: false, error: 'Payout already claimed' } as const;
+
+  const yesTokens = Number(position.yesTokens);
+  const noTokens = Number(position.noTokens);
+
+  let expectedPayout = 0;
+  if (market.outcome === 'YES') expectedPayout = yesTokens;
+  else if (market.outcome === 'NO') expectedPayout = noTokens;
+  else if (market.outcome === 'INVALID') expectedPayout = yesTokens + noTokens;
+
+  if (expectedPayout === 0) {
+    return { success: false, error: 'No winning tokens to claim' } as const;
+  }
+
+  const { provider } = buildProvider();
+  const hotWalletPubkey = provider.wallet.publicKey;
+
+  const escrowProgram = new anchor.Program<EscrowVault>(
+    ESCROW_IDL as EscrowVault,
+    provider,
+  );
+
+  const marketPubkey = new PublicKey(market.marketPda);
+  const vaultPda = deriveVaultPda(marketPubkey);
+
+  let vaultAccount: Awaited<ReturnType<typeof escrowProgram.account.escrowVault.fetch>>;
+  try {
+    vaultAccount = await escrowProgram.account.escrowVault.fetch(vaultPda);
+  } catch {
+    return { success: false, error: 'Failed to fetch vault from Solana' } as const;
+  }
+
+  if (!vaultAccount.isSettled) {
+    return { success: false, error: 'Vault not settled on-chain. Admin must call POST /payouts/resolve/:marketId first.' } as const;
+  }
+
+  const yesTokenMint = vaultAccount.yesTokenMint;
+  const noTokenMint = vaultAccount.noTokenMint;
+  const usdcVault = vaultAccount.usdcVault;
+
+  const hotWalletKeypair = (provider.wallet as anchor.Wallet).payer;
+  const connection = provider.connection;
+
+  const [yesAtaInfo, noAtaInfo, usdcAtaInfo] = await Promise.all([
+    getOrCreateAssociatedTokenAccount(connection, hotWalletKeypair, yesTokenMint, hotWalletPubkey),
+    getOrCreateAssociatedTokenAccount(connection, hotWalletKeypair, noTokenMint, hotWalletPubkey),
+    getOrCreateAssociatedTokenAccount(connection, hotWalletKeypair, USDC_MINT, hotWalletPubkey),
+  ]);
+
+  const userYesAccount = position.yesTokenAccount
+    ? new PublicKey(position.yesTokenAccount)
+    : yesAtaInfo.address;
+
+  const userNoAccount = position.noTokenAccount
+    ? new PublicKey(position.noTokenAccount)
+    : noAtaInfo.address;
+
+  const userUsdc = usdcAtaInfo.address;
+
+  let txSignature: string;
+  try {
+    txSignature = await escrowProgram.methods
+      .claimPayout()
+      .accounts({
+        user: hotWalletPubkey,
+        vault: vaultPda,
+        market: marketPubkey,
+        usdcVault,
+        userUsdc,
+        yesTokenMint,
+        noTokenMint,
+        userYesAccount,
+        userNoAccount,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      } as any)
+      .rpc();
+  } catch (e: any) {
+    const anchorError = anchor.AnchorError.parse(e.logs ?? []);
+    const errorMsg = anchorError
+      ? `${anchorError.error.errorCode.code}: ${anchorError.error.errorMessage}`
+      : (e.message ?? 'Unknown error');
+    console.error('❌ claimPayout failed:', errorMsg);
+    return { success: false, error: `Solana claimPayout failed: ${errorMsg}` } as const;
+  }
+
+  try {
+    await prisma.$transaction([
+      prisma.ledger.update({
+        where: { userId_asset: { userId, asset: 'USDC' } },
+        data: { available: { increment: expectedPayout } },
+      }),
+      prisma.position.update({
+        where: { userId_marketId: { userId, marketId } },
+        data: { isClaimed: true, claimedAt: new Date(), claimTxHash: txSignature },
+      }),
+    ]);
+  } catch (dbError) {
+    await prisma.reconciliationLog.create({
+      data: {
+        userId,
+        marketId,
+        txSignature,
+        type: 'CLAIM_PAYOUT',
+        status: 'PENDING_RECONCILIATION',
+        metadata: JSON.stringify({ expectedPayout, error: String(dbError) }),
+      },
+    }).catch(console.error);
+  }
+
+  return {
+    success: true,
+    data: {
+      marketId,
+      payout: expectedPayout,
+      outcome: market.outcome,
+      yesTokens,
+      noTokens,
+      txSignature,
+    },
+  } as const;
+}
+
 // ─────────────────────────────────────────────────────────────
 // Routes
 // ─────────────────────────────────────────────────────────────
@@ -200,228 +336,49 @@ export const payoutRoutes = new Elysia({ prefix: '/payouts' })
   //   then credited to user's platform ledger for withdrawal.
   // ══════════════════════════════════════════════════════════
   .post('/claim/:marketId', async ({ user, params }) => {
-    console.log(`\n💰 Claim payout: market=${params.marketId} user=${user?.userId}`);
+    if (!user) throw new Error('Unauthorized');
+    return executeClaimPayout(user.userId, params.marketId);
+  })
 
+  .post('/claim-all', async ({ user }) => {
     if (!user) throw new Error('Unauthorized');
 
-    // ── 1. Validate market ───────────────────────────────────
-    const market = await prisma.market.findUnique({ where: { id: params.marketId } });
-
-    if (!market)                     return { success: false, error: 'Market not found' };
-    if (market.state !== 'RESOLVED') return { success: false, error: 'Market not resolved yet. Admin must call POST /payouts/resolve/:marketId first.' };
-    if (!market.outcome)             return { success: false, error: 'Market outcome not set' };
-
-    // ── 2. Validate position ─────────────────────────────────
-    const position = await prisma.position.findUnique({
-      where: { userId_marketId: { userId: user.userId, marketId: params.marketId } },
+    const positions = await prisma.position.findMany({
+      where: { userId: user.userId, isClaimed: false, market: { state: 'RESOLVED' } },
+      include: { market: true },
     });
 
-    if (!position)          return { success: false, error: 'No position found' };
-    if (position.isClaimed) return { success: false, error: 'Payout already claimed' };
+    const claimableMarketIds = positions
+      .filter((position) => {
+        const yesTokens = Number(position.yesTokens);
+        const noTokens = Number(position.noTokens);
+        if (position.market.outcome === 'YES') return yesTokens > 0;
+        if (position.market.outcome === 'NO') return noTokens > 0;
+        if (position.market.outcome === 'INVALID') return yesTokens + noTokens > 0;
+        return false;
+      })
+      .map((position) => position.marketId);
 
-    const yesTokens = Number(position.yesTokens);
-    const noTokens  = Number(position.noTokens);
+    const succeeded: any[] = [];
+    const failed: any[] = [];
 
-    let expectedPayout = 0;
-    if (market.outcome === 'YES')          expectedPayout = yesTokens;
-    else if (market.outcome === 'NO')      expectedPayout = noTokens;
-    else if (market.outcome === 'INVALID') expectedPayout = yesTokens + noTokens;
-
-    if (expectedPayout === 0) {
-      return { success: false, error: 'No winning tokens to claim' };
-    }
-
-    // ── 3. Setup Solana ──────────────────────────────────────
-    // HOT WALLET is the signer — it owns all YES/NO token accounts
-    const { provider } = buildProvider(); // uses ADMIN_PRIVATE_KEY = hot wallet
-    const hotWalletPubkey = provider.wallet.publicKey;
-
-    const escrowProgram = new anchor.Program<EscrowVault>(
-      ESCROW_IDL as EscrowVault,
-      provider,
-    );
-
-    const marketPubkey = new PublicKey(market.marketPda);
-    const vaultPda     = deriveVaultPda(marketPubkey);
-
-    // ── 4. Fetch vault ───────────────────────────────────────
-    let vaultAccount: Awaited<ReturnType<typeof escrowProgram.account.escrowVault.fetch>>;
-    try {
-      vaultAccount = await escrowProgram.account.escrowVault.fetch(vaultPda);
-    } catch {
-      return { success: false, error: 'Failed to fetch vault from Solana' };
-    }
-
-    if (!vaultAccount.isSettled) {
-      return { success: false, error: 'Vault not settled on-chain. Admin must call POST /payouts/resolve/:marketId first.' };
-    }
-
-    const yesTokenMint = vaultAccount.yesTokenMint;
-    const noTokenMint  = vaultAccount.noTokenMint;
-    const usdcVault    = vaultAccount.usdcVault;
-
-    // ── 5. Resolve token accounts ────────────────────────────
-    // Use accounts stored by settlement worker — they are owned by hot wallet.
-    // For the side not held, derive hot wallet ATA as empty placeholder.
-    // Contract only burns what's non-zero so the placeholder is never touched.
-    // ── 5. Ensure token accounts exist on-chain ─────────────────
-    
-    // Hot wallet keypair (payer)
-    const hotWalletKeypair = (provider.wallet as anchor.Wallet).payer;
-    const connection = provider.connection;
-    
-    // Always ensure YES, NO and USDC ATAs exist
-    const [yesAtaInfo, noAtaInfo, usdcAtaInfo] = await Promise.all([
-      getOrCreateAssociatedTokenAccount(
-        connection,
-        hotWalletKeypair,
-        yesTokenMint,
-        hotWalletPubkey
-      ),
-      getOrCreateAssociatedTokenAccount(
-        connection,
-        hotWalletKeypair,
-        noTokenMint,
-        hotWalletPubkey
-      ),
-      getOrCreateAssociatedTokenAccount(
-        connection,
-        hotWalletKeypair,
-        USDC_MINT,
-        hotWalletPubkey
-      ),
-    ]);
-    
-    // If DB already stored token account, use it.
-    // Otherwise use the created ATA.
-    const userYesAccount = position.yesTokenAccount
-      ? new PublicKey(position.yesTokenAccount)
-      : yesAtaInfo.address;
-    
-    const userNoAccount = position.noTokenAccount
-      ? new PublicKey(position.noTokenAccount)
-      : noAtaInfo.address;
-    
-    const userUsdc = usdcAtaInfo.address;
-    
-    console.log('📋 Token accounts verified:');
-    console.log('   userYesAccount:', userYesAccount.toBase58());
-    console.log('   userNoAccount :', userNoAccount.toBase58());
-    console.log('   userUsdc      :', userUsdc.toBase58());
-    
-    
-    
-    console.log('📋 claimPayout accounts:');
-    console.log('   user (hot wallet): ', hotWalletPubkey.toBase58());
-    console.log('   vault:             ', vaultPda.toBase58());
-    console.log('   usdcVault:         ', usdcVault.toBase58());
-    console.log('   userUsdc:          ', userUsdc.toBase58());
-    console.log('   yesTokenMint:      ', yesTokenMint.toBase58());
-    console.log('   noTokenMint:       ', noTokenMint.toBase58());
-    console.log('   userYesAccount:    ', userYesAccount.toBase58(), position.yesTokenAccount ? '(DB)' : '(derived)');
-    console.log('   userNoAccount:     ', userNoAccount.toBase58(),  position.noTokenAccount  ? '(DB)' : '(derived)');
-
-    // ── 6. Call claimPayout on-chain ─────────────────────────
-    // Hot wallet signs automatically via provider
-    let txSignature: string;
-    try {
-      const { getAccount } = await import('@solana/spl-token');
-       const connection = provider.connection;
-
-      const [yesInfo, noInfo, usdcInfo] = await Promise.all([
-        getAccount(connection, userYesAccount).catch(e => ({ error: e.message })),
-        getAccount(connection, userNoAccount).catch(e => ({ error: e.message })),
-        getAccount(connection, userUsdc).catch(e => ({ error: e.message })),
-      ]);
-    
-      console.log('🔍 YES account:', {
-        address: userYesAccount.toBase58(),
-        owner:   (yesInfo as any).owner?.toBase58(),
-        amount:  (yesInfo as any).amount?.toString(),
-        error:   (yesInfo as any).error,
-      });
-    
-      console.log('🔍 NO account:', {
-        address: userNoAccount.toBase58(),
-        owner:   (noInfo as any).owner?.toBase58(),
-        amount:  (noInfo as any).amount?.toString(),
-        error:   (noInfo as any).error,
-      });
-    
-      console.log('🔍 USDC account:', {
-        address: userUsdc.toBase58(),
-        owner:   (usdcInfo as any).owner?.toBase58(),
-        amount:  (usdcInfo as any).amount?.toString(),
-        error:   (usdcInfo as any).error,
-      });
-    
-      console.log('🔍 Hot wallet (user):', hotWalletPubkey.toBase58());
-      // 🔍 DEBUG BLOCK END
-
-      txSignature = await escrowProgram.methods
-        .claimPayout()
-        .accounts({
-          user:           hotWalletPubkey,  // owner of all token accounts
-          vault:          vaultPda,
-          market:         marketPubkey,
-          usdcVault:      usdcVault,
-          userUsdc:       userUsdc,         // hot wallet USDC ATA ← key fix
-          yesTokenMint:   yesTokenMint,
-          noTokenMint:    noTokenMint,
-          userYesAccount: userYesAccount,
-          userNoAccount:  userNoAccount,
-          tokenProgram:   TOKEN_PROGRAM_ID,
-        } as any)
-        .rpc();
-
-      console.log(`✅ claimPayout confirmed: ${txSignature}`);
-
-    } catch (e: any) {
-      const anchorError = anchor.AnchorError.parse(e.logs ?? []);
-      const errorMsg    = anchorError
-        ? `${anchorError.error.errorCode.code}: ${anchorError.error.errorMessage}`
-        : (e.message ?? 'Unknown error');
-      console.error('❌ claimPayout failed:', errorMsg);
-      return { success: false, error: `Solana claimPayout failed: ${errorMsg}` };
-    }
-
-    // ── 7. Update DB atomically — only after on-chain success ──
-    // Credit user's platform ledger — they withdraw via withdrawal worker
-    try {
-      await prisma.$transaction([
-        prisma.ledger.update({
-          where: { userId_asset: { userId: user.userId, asset: 'USDC' } },
-          data:  { available: { increment: expectedPayout } },
-        }),
-        prisma.position.update({
-          where: { userId_marketId: { userId: user.userId, marketId: params.marketId } },
-          data:  { isClaimed: true, claimedAt: new Date(), claimTxHash: txSignature },
-        }),
-      ]);
-      console.log(`💰 ${expectedPayout} USDC credited to user ${user.userId}`);
-
-    } catch (dbError) {
-      // On-chain succeeded — log for reconciliation, do not return error
-      await prisma.reconciliationLog.create({
-        data: {
-          userId:      user.userId,
-          marketId:    params.marketId,
-          txSignature: txSignature,
-          type:        'CLAIM_PAYOUT',
-          status:      'PENDING_RECONCILIATION',
-          metadata:    JSON.stringify({ expectedPayout, error: String(dbError) }),
-        },
-      }).catch(console.error);
+    for (const marketId of claimableMarketIds) {
+      const result = await executeClaimPayout(user.userId, marketId);
+      if (result.success) {
+        succeeded.push(result.data);
+      } else {
+        failed.push({ marketId, error: result.error });
+      }
     }
 
     return {
-      success: true,
+      success: failed.length === 0,
       data: {
-        payout:      expectedPayout,
-        outcome:     market.outcome,
-        yesTokens,
-        noTokens,
-        txSignature,
+        totalRequested: claimableMarketIds.length,
+        claimedCount: succeeded.length,
+        failedCount: failed.length,
+        claims: succeeded,
+        failures: failed,
       },
     };
   })
@@ -450,4 +407,55 @@ export const payoutRoutes = new Elysia({ prefix: '/payouts' })
       .filter(p => p.payout > 0);
 
     return { success: true, data: claimable };
+  })
+
+  .get('/history', async ({ user, query }) => {
+    if (!user) throw new Error('Unauthorized');
+
+    const limit = Math.min(Number(query.limit ?? 50), 100);
+
+    const claimedPositions = await prisma.position.findMany({
+      where: {
+        userId: user.userId,
+        isClaimed: true,
+        claimedAt: { not: null },
+      },
+      include: {
+        market: {
+          select: {
+            id: true,
+            question: true,
+            outcome: true,
+          },
+        },
+      },
+      orderBy: { claimedAt: 'desc' },
+      take: limit,
+    });
+
+    return {
+      success: true,
+      data: claimedPositions.map((position) => {
+        const yesTokens = Number(position.yesTokens);
+        const noTokens = Number(position.noTokens);
+        let amount = 0;
+        if (position.market.outcome === 'YES') amount = yesTokens;
+        else if (position.market.outcome === 'NO') amount = noTokens;
+        else if (position.market.outcome === 'INVALID') amount = yesTokens + noTokens;
+
+        return {
+          id: position.id,
+          marketId: position.market.id,
+          marketQuestion: position.market.question,
+          outcome: position.market.outcome,
+          amount,
+          claimedAt: position.claimedAt,
+          txSignature: position.claimTxHash,
+        };
+      }),
+    };
+  }, {
+    query: t.Object({
+      limit: t.Optional(t.Number({ minimum: 1, maximum: 100 })),
+    }),
   });

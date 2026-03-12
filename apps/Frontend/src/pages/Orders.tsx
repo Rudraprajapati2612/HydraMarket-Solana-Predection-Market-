@@ -1,86 +1,38 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Sidebar } from "../components/Sidebar";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "react-hot-toast";
+import { API_BASE_URL } from "../lib/api";
+import { clearSessionUser } from "../lib/session";
 
-interface Order {
+interface ApiOrder {
   id: string;
   marketId: string;
-  marketQuestion: string;
-  side: "YES" | "NO";
-  price: number;
-  qty: number;
-  filledQty: number;
-  status: "OPEN" | "PENDING" | "FILLED" | "CANCELLED";
+  outcome: "YES" | "NO";
+  side: "BUY" | "SELL";
+  amount: number | string;
+  price: number | string;
+  quantity: number | string;
+  filledQuantity: number | string;
+  status: "OPEN" | "PENDING" | "FILLED" | "CANCELLED" | "PARTIAL" | "FAILED" | "MATCHED";
   createdAt: string;
+  market: {
+    id: string;
+    question: string;
+    state: string;
+  };
 }
-
-const MOCK_ORDERS: Order[] = [
-  {
-    id: "ord_001",
-    marketId: "MKT-AI-2024",
-    marketQuestion: "Will GPT-5 be released in 2024?",
-    side: "YES",
-    price: 0.65,
-    qty: 500,
-    filledQty: 150,
-    status: "OPEN",
-    createdAt: "2026-03-05T10:14:22Z",
-  },
-  {
-    id: "ord_002",
-    marketId: "MKT-POL-US24",
-    marketQuestion: "US Election Winner 2024",
-    side: "NO",
-    price: 0.42,
-    qty: 1200,
-    filledQty: 0,
-    status: "OPEN",
-    createdAt: "2026-03-04T18:45:01Z",
-  },
-  {
-    id: "ord_003",
-    marketId: "MKT-FED-NOV",
-    marketQuestion: "Fed Rate Cut in Nov?",
-    side: "YES",
-    price: 0.22,
-    qty: 250,
-    filledQty: 250,
-    status: "FILLED",
-    createdAt: "2023-10-27T10:14:22Z",
-  },
-  {
-    id: "ord_004",
-    marketId: "MKT-SPACE-29",
-    marketQuestion: "SpaceX Mars Mission 2029",
-    side: "NO",
-    price: 0.85,
-    qty: 100,
-    filledQty: 0,
-    status: "CANCELLED",
-    createdAt: "2023-10-26T18:45:01Z",
-  },
-  {
-    id: "ord_005",
-    marketId: "MKT-BTC-EOY",
-    marketQuestion: "BTC $100k EOY 2024",
-    side: "YES",
-    price: 0.45,
-    qty: 1000,
-    filledQty: 1000,
-    status: "FILLED",
-    createdAt: "2023-10-25T09:12:44Z",
-  },
-];
 
 type FilterStatus = "ALL" | "OPEN" | "FILLED" | "CANCELLED";
 type TimeRange = "1D" | "7D" | "30D" | "90D" | "ALL";
 
+const toNumber = (value: number | string) => Number(value);
+
 export const Orders = () => {
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<ApiOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterStatus>("ALL");
@@ -88,23 +40,45 @@ export const Orders = () => {
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
-
-  const theme = "dark"; // Fixed for this aesthetic
   const isDark = true;
 
-  useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        // Simulate API call
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-        setOrders(MOCK_ORDERS);
-        setIsLoading(false);
-      } catch (err) {
-        setError("FETCH_FAILED");
-        setIsLoading(false);
-      }
-    };
+  const fetchOrders = async () => {
+    const token = localStorage.getItem("token");
 
+    if (!token) {
+      clearSessionUser();
+      navigate("/login");
+      return;
+    }
+
+    try {
+      setError(null);
+      const response = await fetch(`${API_BASE_URL}/orders`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+
+      if (response.status === 401) {
+        clearSessionUser();
+        navigate("/login");
+        return;
+      }
+
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.error || "FETCH_FAILED");
+      }
+
+      setOrders(data.data);
+    } catch (fetchError: any) {
+      setError(fetchError.message || "FETCH_FAILED");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchOrders();
 
     const pollInterval = setInterval(fetchOrders, 30000);
@@ -114,14 +88,43 @@ export const Orders = () => {
       clearInterval(pollInterval);
       clearInterval(clockInterval);
     };
-  }, []);
+  }, [navigate]);
 
   const handleCancelOrder = async (id: string, marketName: string) => {
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      clearSessionUser();
+      navigate("/login");
+      return;
+    }
+
     setCancellingId(id);
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      setOrders((prev) => prev.filter((o) => o.id !== id));
+      const response = await fetch(`${API_BASE_URL}/orders/${id}/cancel`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+
+      if (response.status === 401) {
+        clearSessionUser();
+        navigate("/login");
+        return;
+      }
+
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.error || "CANCEL_FAILED");
+      }
+
+      setOrders((prev) =>
+        prev.map((order) =>
+          order.id === id ? { ...order, status: "CANCELLED" } : order,
+        ),
+      );
+
       toast.success(`ORDER_CANCELLED: ${marketName}`, {
         style: {
           background: "#1a1a1a",
@@ -130,8 +133,8 @@ export const Orders = () => {
           fontFamily: "monospace",
         },
       });
-    } catch (err) {
-      toast.error("CANCEL_FAILED");
+    } catch (cancelError: any) {
+      toast.error(cancelError.message || "CANCEL_FAILED");
     } finally {
       setCancellingId(null);
       setConfirmCancelId(null);
@@ -141,46 +144,45 @@ export const Orders = () => {
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
       if (filter === "ALL") return true;
-      if (filter === "OPEN") return order.status === "OPEN" || order.status === "PENDING";
+      if (filter === "OPEN") return order.status === "OPEN" || order.status === "PENDING" || order.status === "PARTIAL" || order.status === "MATCHED";
       return order.status === filter;
     });
   }, [orders, filter]);
 
   const historyOrders = useMemo(() => {
-    return filteredOrders.filter((o) => o.status === "FILLED" || o.status === "CANCELLED").filter(o => {
+    return filteredOrders
+      .filter((order) => order.status === "FILLED" || order.status === "CANCELLED")
+      .filter((order) => {
         if (timeRange === "ALL") return true;
         const now = new Date();
-        const orderDate = new Date(o.createdAt);
+        const orderDate = new Date(order.createdAt);
         const diffDays = (now.getTime() - orderDate.getTime()) / (1000 * 3600 * 24);
         if (timeRange === "1D") return diffDays <= 1;
         if (timeRange === "7D") return diffDays <= 7;
         if (timeRange === "30D") return diffDays <= 30;
         if (timeRange === "90D") return diffDays <= 90;
         return true;
-    });
+      });
   }, [filteredOrders, timeRange]);
 
   const openOrders = useMemo(() => {
-    return filteredOrders.filter((o) => o.status === "OPEN" || o.status === "PENDING");
+    return filteredOrders.filter((order) => order.status === "OPEN" || order.status === "PENDING" || order.status === "PARTIAL" || order.status === "MATCHED");
   }, [filteredOrders]);
 
   const formatTimestamp = (iso: string) => {
-    const d = new Date(iso);
-    return d.toISOString().replace("T", " ").split(".")[0];
+    const date = new Date(iso);
+    return date.toISOString().replace("T", " ").split(".")[0];
   };
 
-  const truncate = (str: string, n: number) => {
-    return str.length > n ? str.substr(0, n - 1) + "..." : str;
+  const truncate = (value: string, length: number) => {
+    return value.length > length ? `${value.substring(0, length - 3)}...` : value;
   };
 
   if (error) {
     return (
       <div className="h-screen bg-bg-dark flex flex-col items-center justify-center font-mono text-pro-red">
         <div className="mb-4">ERR: {error} //</div>
-        <button 
-          onClick={() => window.location.reload()}
-          className="border border-pro-red px-4 py-2 hover:bg-pro-red/10 transition-colors"
-        >
+        <button onClick={fetchOrders} className="border border-pro-red px-4 py-2 hover:bg-pro-red/10 transition-colors">
           [RETRY]
         </button>
       </div>
@@ -189,7 +191,6 @@ export const Orders = () => {
 
   return (
     <div className="bg-bg-dark text-text-light font-mono antialiased overflow-hidden h-screen flex flex-col relative selection:bg-cyber-blue selection:text-white">
-      {/* System Status Bar */}
       <div className="h-8 w-full bg-card-dark border-b border-border-dark flex items-center justify-between px-4 z-50">
         <div className="flex items-center gap-2 text-[10px] text-text-muted font-code uppercase tracking-wider">
           <span className="w-1.5 h-1.5 rounded-full bg-pro-green animate-pulse"></span>
@@ -201,16 +202,11 @@ export const Orders = () => {
         <Sidebar isDark={isDark} isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
 
         <main className="flex-1 flex flex-col min-w-0 bg-bg-dark relative overflow-hidden">
-          {/* Grid Background */}
           <div className="absolute inset-0 grid-dark grid-bg pointer-events-none"></div>
 
-          {/* Topbar */}
           <header className="h-16 border-b border-border-dark bg-bg-dark/90 backdrop-blur-sm sticky top-0 z-30 flex items-center justify-between px-4 md:px-8 shrink-0">
             <div className="flex items-center gap-4">
-              <button
-                className="lg:hidden text-text-muted hover:text-cyber-blue transition-colors"
-                onClick={() => setIsSidebarOpen(true)}
-              >
+              <button className="lg:hidden text-text-muted hover:text-cyber-blue transition-colors" onClick={() => setIsSidebarOpen(true)}>
                 <span className="material-symbols-outlined">menu</span>
               </button>
               <h1 className="text-sm md:text-lg font-code font-bold text-text-light tracking-tight uppercase flex items-center gap-1">
@@ -223,61 +219,38 @@ export const Orders = () => {
               onClick={() => navigate("/markets-terminal")}
               className="px-4 py-2 bg-cyber-blue/10 border border-cyber-blue/30 text-cyber-blue hover:bg-cyber-blue hover:text-bg-dark transition-all text-xs font-bold flex items-center gap-2"
             >
-              [🚀 DEPLOY_ORDER]
+              [DEPLOY_ORDER]
             </button>
           </header>
 
-          {/* Content Area */}
           <div className="flex-1 overflow-y-auto p-4 md:p-8 relative z-10">
-            {/* Filter Bar */}
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8 border-b border-border-dark pb-4 overflow-x-auto no-scrollbar">
               <div className="flex items-center gap-2 shrink-0">
-                <FilterButton 
-                  label="[ALL_ORDERS]" 
-                  active={filter === "ALL"} 
-                  onClick={() => setFilter("ALL")} 
-                />
+                <FilterButton label="[ALL_ORDERS]" active={filter === "ALL"} onClick={() => setFilter("ALL")} />
                 <div className="w-px h-4 bg-border-dark mx-2"></div>
-                <FilterButton 
-                  label="[STATUS: OPEN]" 
-                  active={filter === "OPEN"} 
-                  onClick={() => setFilter("OPEN")} 
-                />
-                <FilterButton 
-                  label="[STATUS: FILLED]" 
-                  active={filter === "FILLED"} 
-                  onClick={() => setFilter("FILLED")} 
-                />
-                <FilterButton 
-                  label="[STATUS: CANCELLED]" 
-                  active={filter === "CANCELLED"} 
-                  onClick={() => setFilter("CANCELLED")} 
-                />
+                <FilterButton label="[STATUS: OPEN]" active={filter === "OPEN"} onClick={() => setFilter("OPEN")} />
+                <FilterButton label="[STATUS: FILLED]" active={filter === "FILLED"} onClick={() => setFilter("FILLED")} />
+                <FilterButton label="[STATUS: CANCELLED]" active={filter === "CANCELLED"} onClick={() => setFilter("CANCELLED")} />
               </div>
 
               <div className="flex items-center gap-4 shrink-0">
                 <div className="w-px h-4 bg-border-dark hidden md:block"></div>
                 <div className="relative group">
-                    <button className="flex items-center gap-2 text-[10px] text-text-muted hover:text-cyber-blue transition-colors uppercase">
-                        <span className="material-symbols-outlined text-sm">calendar_today</span>
-                        [TIME_RANGE: {timeRange}]
-                    </button>
-                    <div className="absolute right-0 top-full mt-2 w-32 bg-card-dark border border-border-dark hidden group-hover:block z-50">
-                        {["1D", "7D", "30D", "90D", "ALL"].map((t) => (
-                            <button 
-                                key={t}
-                                onClick={() => setTimeRange(t as TimeRange)}
-                                className="w-full text-left px-4 py-2 text-[10px] hover:bg-cyber-blue/10 hover:text-cyber-blue transition-colors"
-                            >
-                                {t}
-                            </button>
-                        ))}
-                    </div>
+                  <button className="flex items-center gap-2 text-[10px] text-text-muted hover:text-cyber-blue transition-colors uppercase">
+                    <span className="material-symbols-outlined text-sm">calendar_today</span>
+                    [TIME_RANGE: {timeRange}]
+                  </button>
+                  <div className="absolute right-0 top-full mt-2 w-32 bg-card-dark border border-border-dark hidden group-hover:block z-50">
+                    {(["1D", "7D", "30D", "90D", "ALL"] as TimeRange[]).map((range) => (
+                      <button key={range} onClick={() => setTimeRange(range)} className="w-full text-left px-4 py-2 text-[10px] hover:bg-cyber-blue/10 hover:text-cyber-blue transition-colors">
+                        {range}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Open Orders Section */}
             {(filter === "ALL" || filter === "OPEN") && (
               <section className="mb-12">
                 <h2 className="text-xs font-bold font-code mb-6 flex items-center gap-2 uppercase">
@@ -290,7 +263,7 @@ export const Orders = () => {
                     <thead>
                       <tr className="border-b border-border-dark text-[10px] text-text-muted uppercase tracking-wider font-code">
                         <th className="pb-3 font-medium">MARKET</th>
-                        <th className="pb-3 font-medium">SIDE</th>
+                        <th className="pb-3 font-medium">POSITION</th>
                         <th className="pb-3 font-medium">PRICE</th>
                         <th className="pb-3 font-medium text-right">QTY</th>
                         <th className="pb-3 font-medium px-8">FILLED%</th>
@@ -306,85 +279,67 @@ export const Orders = () => {
                             <div className="flex flex-col items-center gap-4">
                               <div className="text-text-muted text-xs">&gt; NULL_QUEUE</div>
                               <div className="text-[10px] text-text-muted/60">No pending orders found.</div>
-                              <button 
-                                onClick={() => navigate("/markets-terminal")}
-                                className="text-[10px] text-cyber-blue hover:underline"
-                              >
+                              <button onClick={() => navigate("/markets-terminal")} className="text-[10px] text-cyber-blue hover:underline">
                                 [DEPLOY_ORDER →]
                               </button>
                             </div>
                           </td>
                         </tr>
                       ) : (
-                        openOrders.map((order) => (
-                          <React.Fragment key={order.id}>
-                            <tr className="border-b border-border-dark/30 hover:bg-white/5 transition-colors group">
-                              <td className="py-4">
-                                <div className="font-bold text-text-light">{truncate(order.marketQuestion, 40)}</div>
-                                <div className="text-[10px] text-text-muted mt-1">{order.marketId}</div>
-                              </td>
-                              <td className="py-4">
-                                <span className={`px-2 py-0.5 rounded-sm text-[9px] font-bold ${order.side === "YES" ? "bg-pro-green text-bg-dark" : "bg-pro-red text-text-light"}`}>
-                                  {order.side}
-                                </span>
-                              </td>
-                              <td className="py-4 text-text-light">${order.price.toFixed(2)}</td>
-                              <td className="py-4 text-right text-text-light">{order.qty.toLocaleString()}</td>
-                              <td className="py-4 px-8">
-                                <div className="flex items-center gap-3">
-                                  <div className="flex-1 h-1.5 bg-card-dark rounded-full overflow-hidden">
-                                    <div 
-                                      className={`h-full ${order.side === "YES" ? "bg-pro-green" : "bg-pro-red"}`}
-                                      style={{ width: `${(order.filledQty / order.qty) * 100}%` }}
-                                    ></div>
-                                  </div>
-                                  <span className="text-[10px] text-text-muted w-8 text-right">
-                                    {Math.round((order.filledQty / order.qty) * 100)}%
+                        openOrders.map((order) => {
+                          const qty = toNumber(order.quantity);
+                          const filledQty = toNumber(order.filledQuantity);
+                          const fillPercent = qty > 0 ? Math.round((filledQty / qty) * 100) : 0;
+                          return (
+                            <React.Fragment key={order.id}>
+                              <tr className="border-b border-border-dark/30 hover:bg-white/5 transition-colors group">
+                                <td className="py-4">
+                                  <div className="font-bold text-text-light">{truncate(order.market.question, 40)}</div>
+                                  <div className="text-[10px] text-text-muted mt-1">{order.marketId}</div>
+                                </td>
+                                <td className="py-4">
+                                  <span className={`px-2 py-0.5 rounded-sm text-[9px] font-bold ${order.outcome === "YES" ? "bg-pro-green text-bg-dark" : "bg-pro-red text-text-light"}`}>
+                                    {order.side} {order.outcome}
                                   </span>
-                                </div>
-                              </td>
-                              <td className="py-4 text-right">
-                                <button 
-                                  onClick={() => setConfirmCancelId(order.id)}
-                                  disabled={cancellingId === order.id}
-                                  className="px-3 py-1 border border-border-dark text-text-muted hover:border-pro-red hover:text-pro-red transition-all text-[10px]"
-                                >
-                                  {cancellingId === order.id ? "[CANCELLING...]" : "[CANCEL]"}
-                                </button>
-                              </td>
-                            </tr>
-                            <AnimatePresence>
-                              {confirmCancelId === order.id && (
-                                <motion.tr 
-                                  initial={{ opacity: 0, height: 0 }}
-                                  animate={{ opacity: 1, height: "auto" }}
-                                  exit={{ opacity: 0, height: 0 }}
-                                  className="bg-pro-red/5"
-                                >
-                                  <td colSpan={6} className="p-4">
-                                    <div className="flex items-center justify-end gap-6 text-[10px]">
-                                      <span className="text-pro-red font-bold uppercase tracking-widest">Confirm cancel order?</span>
-                                      <div className="flex gap-2">
-                                        <button 
-                                          onClick={() => handleCancelOrder(order.id, order.marketQuestion)}
-                                          className="px-4 py-1 bg-pro-red text-text-light font-bold hover:bg-pro-red/80 transition-colors"
-                                        >
-                                          [YES_CANCEL]
-                                        </button>
-                                        <button 
-                                          onClick={() => setConfirmCancelId(null)}
-                                          className="px-4 py-1 border border-border-dark text-text-muted hover:text-text-light transition-colors"
-                                        >
-                                          [ABORT]
-                                        </button>
-                                      </div>
+                                </td>
+                                <td className="py-4 text-text-light">${toNumber(order.price).toFixed(2)}</td>
+                                <td className="py-4 text-right text-text-light">{qty.toLocaleString()}</td>
+                                <td className="py-4 px-8">
+                                  <div className="flex items-center gap-3">
+                                    <div className="flex-1 h-1.5 bg-card-dark rounded-full overflow-hidden">
+                                      <div className={`h-full ${order.outcome === "YES" ? "bg-pro-green" : "bg-pro-red"}`} style={{ width: `${fillPercent}%` }}></div>
                                     </div>
-                                  </td>
-                                </motion.tr>
-                              )}
-                            </AnimatePresence>
-                          </React.Fragment>
-                        ))
+                                    <span className="text-[10px] text-text-muted w-8 text-right">{fillPercent}%</span>
+                                  </div>
+                                </td>
+                                <td className="py-4 text-right">
+                                  <button onClick={() => setConfirmCancelId(order.id)} disabled={cancellingId === order.id} className="px-3 py-1 border border-border-dark text-text-muted hover:border-pro-red hover:text-pro-red transition-all text-[10px]">
+                                    {cancellingId === order.id ? "[CANCELLING...]" : "[CANCEL]"}
+                                  </button>
+                                </td>
+                              </tr>
+                              <AnimatePresence>
+                                {confirmCancelId === order.id && (
+                                  <motion.tr initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="bg-pro-red/5">
+                                    <td colSpan={6} className="p-4">
+                                      <div className="flex items-center justify-end gap-6 text-[10px]">
+                                        <span className="text-pro-red font-bold uppercase tracking-widest">Confirm cancel order?</span>
+                                        <div className="flex gap-2">
+                                          <button onClick={() => handleCancelOrder(order.id, order.market.question)} className="px-4 py-1 bg-pro-red text-text-light font-bold hover:bg-pro-red/80 transition-colors">
+                                            [YES_CANCEL]
+                                          </button>
+                                          <button onClick={() => setConfirmCancelId(null)} className="px-4 py-1 border border-border-dark text-text-muted hover:text-text-light transition-colors">
+                                            [ABORT]
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </td>
+                                  </motion.tr>
+                                )}
+                              </AnimatePresence>
+                            </React.Fragment>
+                          );
+                        })
                       )}
                     </tbody>
                   </table>
@@ -392,7 +347,6 @@ export const Orders = () => {
               </section>
             )}
 
-            {/* Order History Section */}
             {(filter === "ALL" || filter === "FILLED" || filter === "CANCELLED") && (
               <section>
                 <h2 className="text-xs font-bold font-code mb-6 flex items-center gap-2 uppercase">
@@ -406,7 +360,7 @@ export const Orders = () => {
                       <tr className="border-b border-border-dark text-[10px] text-text-muted uppercase tracking-wider font-code">
                         <th className="pb-3 font-medium">TIMESTAMP</th>
                         <th className="pb-3 font-medium">MARKET</th>
-                        <th className="pb-3 font-medium">SIDE</th>
+                        <th className="pb-3 font-medium">POSITION</th>
                         <th className="pb-3 font-medium">EXEC_PRICE</th>
                         <th className="pb-3 font-medium text-right">QTY</th>
                         <th className="pb-3 font-medium text-right">STATUS</th>
@@ -425,14 +379,14 @@ export const Orders = () => {
                         historyOrders.map((order) => (
                           <tr key={order.id} className="border-b border-border-dark/20 hover:bg-white/5 transition-colors group">
                             <td className="py-4 text-text-muted text-[10px] whitespace-nowrap">{formatTimestamp(order.createdAt)}</td>
-                            <td className="py-4 text-text-light">{truncate(order.marketQuestion, 50)}</td>
+                            <td className="py-4 text-text-light">{truncate(order.market.question, 50)}</td>
                             <td className="py-4">
-                              <span className={`px-1.5 py-0.5 rounded-sm text-[8px] font-bold ${order.side === "YES" ? "bg-pro-green/20 text-pro-green" : "bg-pro-red/20 text-pro-red"}`}>
-                                {order.side}
+                              <span className={`px-1.5 py-0.5 rounded-sm text-[8px] font-bold ${order.outcome === "YES" ? "bg-pro-green/20 text-pro-green" : "bg-pro-red/20 text-pro-red"}`}>
+                                {order.side} {order.outcome}
                               </span>
                             </td>
-                            <td className="py-4 text-text-light">${order.price.toFixed(2)}</td>
-                            <td className="py-4 text-right text-text-light">{order.qty.toLocaleString()}</td>
+                            <td className="py-4 text-text-light">${toNumber(order.price).toFixed(2)}</td>
+                            <td className="py-4 text-right text-text-light">{toNumber(order.quantity).toLocaleString()}</td>
                             <td className="py-4 text-right">
                               <span className={`px-2 py-0.5 border text-[9px] font-bold uppercase tracking-tighter ${order.status === "FILLED" ? "border-pro-green/30 text-pro-green" : "border-text-muted/30 text-text-muted"}`}>
                                 [{order.status}]
@@ -446,18 +400,14 @@ export const Orders = () => {
                 </div>
 
                 <div className="mt-8 flex justify-center">
-                    <button 
-                        onClick={() => toast("Archive export coming soon", { icon: "📦" })}
-                        className="flex items-center gap-2 text-[10px] text-text-muted/40 hover:text-text-muted transition-colors uppercase tracking-widest"
-                    >
-                        LOAD_ARCHIVE_DATA <span className="material-symbols-outlined text-sm">download</span>
-                    </button>
+                  <button onClick={() => toast("Archive export coming soon", { icon: "📦" })} className="flex items-center gap-2 text-[10px] text-text-muted/40 hover:text-text-muted transition-colors uppercase tracking-widest">
+                    LOAD_ARCHIVE_DATA <span className="material-symbols-outlined text-sm">download</span>
+                  </button>
                 </div>
               </section>
             )}
           </div>
 
-          {/* Bottom Status Bar */}
           <footer className="h-8 border-t border-border-dark bg-bg-dark/80 backdrop-blur-sm flex items-center justify-between px-4 text-[9px] font-mono text-text-muted uppercase tracking-wider shrink-0">
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-2">
@@ -471,10 +421,8 @@ export const Orders = () => {
               <div className="hidden md:block">LATENCY: 24MS</div>
             </div>
             <div className="flex items-center gap-6">
-              <div className="hidden lg:block">USER_SESSION_ID: 0x02...F92A</div>
-              <div className="text-cyber-blue font-bold">
-                {currentTime.toISOString().replace("T", " ").split(".")[0]} UTC
-              </div>
+              <div className="hidden lg:block">USER_SESSION_ID: {localStorage.getItem("userId")?.slice(0, 6) || "------"}...</div>
+              <div className="text-cyber-blue font-bold">{currentTime.toISOString().replace("T", " ").split(".")[0]} UTC</div>
             </div>
           </footer>
         </main>
@@ -487,9 +435,7 @@ const FilterButton = ({ label, active, onClick }: { label: string; active: boole
   <button
     onClick={onClick}
     className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest transition-all ${
-      active 
-        ? "bg-cyber-blue text-bg-dark border border-cyber-blue" 
-        : "text-text-muted border border-border-dark hover:border-cyber-blue/50 hover:text-text-light"
+      active ? "bg-cyber-blue text-bg-dark border border-cyber-blue" : "text-text-muted border border-border-dark hover:border-cyber-blue/50 hover:text-text-light"
     }`}
   >
     {label}
@@ -498,10 +444,10 @@ const FilterButton = ({ label, active, onClick }: { label: string; active: boole
 
 const SkeletonRows = ({ count, columns }: { count: number; columns: number }) => (
   <>
-    {Array.from({ length: count }).map((_, i) => (
-      <tr key={i} className="border-b border-border-dark/30">
-        {Array.from({ length: columns }).map((_, j) => (
-          <td key={j} className="py-6">
+    {Array.from({ length: count }).map((_, rowIndex) => (
+      <tr key={rowIndex} className="border-b border-border-dark/30">
+        {Array.from({ length: columns }).map((_, columnIndex) => (
+          <td key={columnIndex} className="py-6">
             <div className="h-2 bg-card-dark rounded-full animate-pulse w-3/4"></div>
           </td>
         ))}

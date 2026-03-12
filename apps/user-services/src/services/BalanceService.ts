@@ -5,6 +5,7 @@ import Redis  from "ioredis"
 import { resolve } from "bun"
 
 const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379')
+const DEFAULT_DEPOSIT_ADDRESS = "6oktp2QmgQgmxKxzBfgTGD11T1VwmQx8Gxkg8gcUMG72";
 
 export class BalanceService{
     async getBalance(userId : string,asset: string = 'USDC'){
@@ -128,7 +129,7 @@ export class BalanceService{
           throw new Error('User not found');
         }
         
-        const hotWalletAddress = process.env.HOT_WALLET_ADDRESS;
+        const hotWalletAddress = process.env.HOT_WALLET_ADDRESS || DEFAULT_DEPOSIT_ADDRESS;
         
         return {
           depositAddress: hotWalletAddress,
