@@ -23,6 +23,7 @@ export const authRoutes = new Elysia({ prefix: '/auth' })
           userId: response.user_id,
           email: response.email,
           username: response.username,
+          role: response.role,
           depositememo : response.deposite_memo,
           token: response.token,
         },
@@ -88,6 +89,7 @@ export const authRoutes = new Elysia({ prefix: '/auth' })
           userId: response.user_id,
           email: response.email,
           username: response.username,
+          role: response.role,
           walletAddress: response.wallet_address,
           token: response.token
         },

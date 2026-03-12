@@ -400,7 +400,11 @@ export const Profile = () => {
                   <div className="pt-6">
                     <button 
                       onClick={() => {
+                        localStorage.removeItem('token');
                         localStorage.removeItem('userRole');
+                        localStorage.removeItem('username');
+                        localStorage.removeItem('email');
+                        localStorage.removeItem('userId');
                         navigate('/login');
                       }}
                       className="px-4 py-2 border border-pro-red/30 text-pro-red text-[10px] font-bold uppercase tracking-widest hover:bg-pro-red/10 transition-all"

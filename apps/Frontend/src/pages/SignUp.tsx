@@ -7,6 +7,9 @@ export const SignUp = () => {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const navigate = useNavigate();
   const [passcode, setPasscode] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [showPasscode, setShowPasscode] = useState(false);
 
   const getSecurityLevel = (pass: string) => {
@@ -36,6 +39,36 @@ export const SignUp = () => {
       document.documentElement.classList.remove("dark");
     }
   }, [isDarkMode]);
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+  
+    try {
+      const res = await fetch("http://localhost:3000/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          username,
+          password: passcode,
+          fullName,
+        }),
+      });
+  
+      const data = await res.json();
+  
+      if (data.success) {
+        localStorage.setItem("token", data.data.token);
+        navigate("/dashboard");
+      } else {
+        alert("Registration failed");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   return (
     <div className={`min-h-screen flex flex-col font-mono antialiased overflow-x-hidden relative transition-colors duration-300 ${isDarkMode ? 'bg-terminal-black text-white' : 'bg-white text-terminal-black'}`}>
@@ -98,7 +131,7 @@ export const SignUp = () => {
               </p>
             </div>
 
-            <form className="space-y-6">
+            <form className="space-y-6" onSubmit={handleRegister}>
               <div className="space-y-2 group">
                 <label className={`block text-xs font-code uppercase tracking-wider transition-colors duration-300 ${isDarkMode ? 'text-neon-blue/80 group-hover:text-neon-blue' : 'text-gray-600 group-hover:text-blue-600'}`}>
                   &gt; Full_Name
@@ -106,9 +139,11 @@ export const SignUp = () => {
                 <div className="relative">
                   <input 
                     className={`w-full border font-mono text-sm px-4 py-3 outline-none transition-all ${isDarkMode ? 'bg-black/50 border-gray-700 text-white focus:border-neon-blue focus:ring-1 focus:ring-neon-blue focus:shadow-neon-input placeholder-gray-600' : 'bg-gray-50 border-gray-200 text-gray-900 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 placeholder-gray-400'}`}
-                    placeholder="Enter designation..." 
+                    placeholder="Enter designation..."
+                    onChange  = {(e)=>setFullName(e.target.value)}
                     type="text"
                   />
+
                   {isDarkMode && <div className="absolute right-0 top-0 bottom-0 w-1 bg-neon-blue opacity-0 group-hover:opacity-100 transition-opacity"></div>}
                 </div>
               </div>
@@ -121,7 +156,9 @@ export const SignUp = () => {
                   <span className={`absolute left-4 top-1/2 -translate-y-1/2 font-mono transition-colors duration-300 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>@</span>
                   <input 
                     className={`w-full border font-mono text-sm pl-8 pr-4 py-3 outline-none transition-all ${isDarkMode ? 'bg-black/50 border-gray-700 text-white focus:border-neon-blue focus:ring-1 focus:ring-neon-blue focus:shadow-neon-input placeholder-gray-600' : 'bg-gray-50 border-gray-200 text-gray-900 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 placeholder-gray-400'}`}
-                    placeholder="crypto_runner" 
+                    placeholder="crypto_runner"
+                    value = {username}
+                    onChange = {(e)=> setUsername(e.target.value)} 
                     type="text"
                   />
                 </div>
@@ -135,6 +172,8 @@ export const SignUp = () => {
                   <input 
                     className={`w-full border font-mono text-sm px-4 py-3 outline-none transition-all ${isDarkMode ? 'bg-black/50 border-gray-700 text-white focus:border-neon-blue focus:ring-1 focus:ring-neon-blue focus:shadow-neon-input placeholder-gray-600' : 'bg-gray-50 border-gray-200 text-gray-900 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 placeholder-gray-400'}`}
                     placeholder="node@network.com" 
+                    value = {email}
+                    onChange = {(e)=>setEmail(e.target.value)}
                     type="email"
                   />
                 </div>
@@ -181,7 +220,8 @@ export const SignUp = () => {
 
               <div className="pt-4">
                 <button 
-                  onClick={() => navigate("/dashboard")}
+                  // onClick={() => navigate("/dashboard")}
+                  type="sumbit"
                   className={`w-full h-12 font-code font-bold text-sm uppercase tracking-wider transition-all border flex items-center justify-center gap-2 group ${isDarkMode ? 'bg-neon-blue text-black border-neon-blue hover:bg-white hover:text-black hover:shadow-neon' : 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700 hover:shadow-lg'}`}
                 >
                   <Settings className={`w-5 h-5 group-hover:animate-spin`} />

@@ -10,8 +10,8 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ isDark, isSidebarOpen, setIsSidebarOpen }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const userRole = localStorage.getItem("userRole") || "user";
-  const isAdmin = userRole === "admin";
+  const userRole = localStorage.getItem("userRole") || "USER";
+  const isAdmin = userRole === "ADMIN" || userRole === "SUPERADMIN";
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -33,7 +33,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isDark, isSidebarOpen, setIsSi
     return colors[Math.abs(hash) % colors.length];
   };
 
-  const username = "USER_77491"; // In a real app, this would come from auth context
+  const username = localStorage.getItem("username") || "USER_77491";
 
   const NavButton = ({ path, icon, label, active = false }: { path: string; icon: string; label: string; active?: boolean }) => (
     <button 

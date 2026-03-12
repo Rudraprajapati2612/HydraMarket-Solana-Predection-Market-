@@ -157,7 +157,7 @@ export const MarketsTerminal = () => {
               <h1 className={`text-xl sm:text-3xl font-serif ${isDark ? "text-white" : "text-charcoal"} tracking-tight uppercase truncate`}>MARKETS</h1>
             </div>
             <div className="flex items-center gap-2 sm:gap-4">
-              {localStorage.getItem("userRole") === "admin" && (
+              {(localStorage.getItem("userRole") === "ADMIN" || localStorage.getItem("userRole") === "SUPERADMIN") && (
                 <button 
                   onClick={() => navigate("/create-market")}
                   className={`hidden sm:flex items-center gap-2 px-4 py-2 ${isDark ? "bg-card-dark border-cyber-blue text-cyber-blue" : "bg-white border-cyber-blue text-cyber-blue"} font-code text-xs font-bold border rounded-sm hover:bg-cyber-blue hover:text-white transition-all shadow-[0_0_10px_rgba(0,209,255,0.2)]`}

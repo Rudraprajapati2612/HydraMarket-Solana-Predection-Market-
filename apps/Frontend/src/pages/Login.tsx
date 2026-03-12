@@ -2,11 +2,16 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Sun, Moon } from "lucide-react";
 import { motion } from "motion/react";
+import { API_BASE_URL } from "../lib/api";
 
 export const Login = () => {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const navigate = useNavigate();
   const [currentTime, setCurrentTime] = useState("00:00:00");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -26,16 +31,54 @@ export const Login = () => {
     }
   }, [isDarkMode]);
 
-  const handleLogin = (e: React.FormEvent) => {
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    const role = localStorage.getItem("userRole");
+
+    if (!token || !role) {
+      return;
+    }
+
+    navigate(role === "ADMIN" || role === "SUPERADMIN" ? "/admin" : "/dashboard");
+  }, [navigate]);
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const username = (document.getElementById("username") as HTMLInputElement).value;
-    
-    if (username.toLowerCase() === "admin") {
-      localStorage.setItem("userRole", "admin");
-      navigate("/admin");
-    } else {
-      localStorage.setItem("userRole", "user");
-      navigate("/dashboard");
+
+    setError("");
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data?.message || data?.error || "Login failed");
+      }
+
+      const role = data.data.role;
+
+      localStorage.setItem("token", data.data.token);
+      localStorage.setItem("userRole", role);
+      localStorage.setItem("username", data.data.username);
+      localStorage.setItem("email", data.data.email);
+      localStorage.setItem("userId", data.data.userId);
+
+      navigate(role === "ADMIN" || role === "SUPERADMIN" ? "/admin" : "/dashboard");
+    } catch (err: any) {
+      setError(err.message || "Unable to login");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -105,14 +148,17 @@ export const Login = () => {
             <form className="space-y-6" onSubmit={handleLogin}>
               <div className="space-y-2 group/field">
                 <label className={`block text-xs font-code uppercase tracking-widest transition-all duration-500 ${isDarkMode ? 'text-neon-blue group-hover/field:text-glow' : 'text-blue-600 font-bold'}`} htmlFor="username">
-                  &gt; IDENTIFIER
+                  &gt; EMAIL_ADDR
                 </label>
                 <div className="relative">
                   <input 
                     className={`block w-full font-mono text-sm px-4 py-3 focus:outline-none focus:ring-1 transition-all duration-500 ${isDarkMode ? 'bg-black/50 border border-gray-700 text-white focus:border-neon-blue focus:ring-neon-blue placeholder-gray-800' : 'bg-slate-50 border border-border-gray text-slate-900 focus:border-blue-600 focus:ring-blue-600 placeholder-slate-300'}`}
                     id="username" 
-                    placeholder="USR_ID or EMAIL_ADDR" 
-                    type="text"
+                    placeholder="node@hydra.com" 
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
                   />
                   <div className={`absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-500 ${isDarkMode ? 'text-gray-600' : 'text-slate-300'}`}>
                     <span className="material-symbols-outlined text-sm">badge</span>
@@ -130,12 +176,21 @@ export const Login = () => {
                     id="password" 
                     placeholder="****************" 
                     type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
                   />
                   <div className={`absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-500 ${isDarkMode ? 'text-gray-600' : 'text-slate-300'}`}>
                     <span className="material-symbols-outlined text-sm">key</span>
                   </div>
                 </div>
               </div>
+
+              {error && (
+                <div className="text-[11px] font-mono text-red-500 uppercase tracking-wide">
+                  {error}
+                </div>
+              )}
 
               <div className="flex items-center justify-between text-xs font-mono">
                 <div className="flex items-center">
@@ -153,11 +208,12 @@ export const Login = () => {
               </div>
 
               <button 
+                disabled={isSubmitting}
                 className={`w-full relative group overflow-hidden font-code font-bold uppercase tracking-widest py-3 px-4 transition-all duration-300 mt-4 ${isDarkMode ? 'bg-neon-blue/10 border border-neon-blue text-neon-blue shadow-neon-sm hover:shadow-neon' : 'bg-blue-600 border border-blue-600 text-white hover:bg-blue-700 shadow-md'}`} 
                 type="submit"
               >
                 <span className={`relative z-10 flex items-center justify-center gap-2 transition-colors duration-300 ${isDarkMode ? 'group-hover:text-black' : 'text-white'}`}>
-                  ACCESS_SYSTEM
+                  {isSubmitting ? "AUTHENTICATING" : "ACCESS_SYSTEM"}
                   <span className="material-symbols-outlined text-sm group-hover:translate-x-1 transition-transform">login</span>
                 </span>
                 {isDarkMode && (
