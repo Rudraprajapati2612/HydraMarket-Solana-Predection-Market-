@@ -28,6 +28,7 @@ interface MarketCard {
   description: string;
   volume: string;
   expiry: string;
+  expiresAt: string;
   liquidity: string;
   odds: number;
   traders: number;
@@ -58,6 +59,7 @@ export const MarketsTerminal = () => {
     return (saved as "light" | "dark") || "dark";
   });
   const [markets, setMarkets] = useState<MarketCard[]>([]);
+  const [now, setNow] = useState(() => Date.now());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -85,22 +87,25 @@ export const MarketsTerminal = () => {
           throw new Error(data?.message || data?.error || "Failed to load markets");
         }
 
-        const nextMarkets = (data.data as ApiMarket[]).map((market) => ({
-          id: market.id,
-          category: (market.category || "OTHER").toUpperCase(),
-          status: getStatus(market),
-          title: market.question,
-          description: market.description,
-          volume: formatUsd(Number(market.stats?.totalVolume || 0)),
-          expiry: new Date(market.expiresAt).toLocaleDateString("en-US", {
-            month: "short",
-            day: "2-digit",
-            year: "numeric",
-          }).toUpperCase(),
-          liquidity: formatUsd(Number(market.stats?.liquidity || 0)),
-          odds: Number(market.price?.impliedProbabilityYes ?? 50),
-          traders: Number(market.stats?.participants || 0),
-        }));
+        const nextMarkets = (data.data as ApiMarket[])
+          .filter((market) => market.state === "RESOLVED" || new Date(market.expiresAt).getTime() > Date.now())
+          .map((market) => ({
+            id: market.id,
+            category: (market.category || "OTHER").toUpperCase(),
+            status: getStatus(market),
+            title: market.question,
+            description: market.description,
+            volume: formatUsd(Number(market.stats?.totalVolume || 0)),
+            expiry: new Date(market.expiresAt).toLocaleDateString("en-US", {
+              month: "short",
+              day: "2-digit",
+              year: "numeric",
+            }).toUpperCase(),
+            expiresAt: market.expiresAt,
+            liquidity: formatUsd(Number(market.stats?.liquidity || 0)),
+            odds: Number(market.price?.impliedProbabilityYes ?? 50),
+            traders: Number(market.stats?.participants || 0),
+          }));
 
         setMarkets(nextMarkets);
       } catch (err: any) {
@@ -111,6 +116,14 @@ export const MarketsTerminal = () => {
     };
 
     loadMarkets();
+  }, []);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setNow(Date.now());
+    }, 30000);
+
+    return () => window.clearInterval(intervalId);
   }, []);
 
   const toggleTheme = () => {
@@ -126,13 +139,14 @@ export const MarketsTerminal = () => {
 
   const filteredMarkets = useMemo(() => {
     return markets.filter((market) => {
+      const isVisible = market.status === "RESOLVED" || new Date(market.expiresAt).getTime() > now;
       const matchesSearch =
         market.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         market.description.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesCategory = activeCategory === "ALL" || market.category === activeCategory;
-      return matchesSearch && matchesCategory;
+      return isVisible && matchesSearch && matchesCategory;
     });
-  }, [markets, searchQuery, activeCategory]);
+  }, [markets, now, searchQuery, activeCategory]);
 
   return (
     <div

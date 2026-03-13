@@ -45,7 +45,10 @@ impl MatchingEngine for MatchingEngineService {
         
         // Parse order
         let order = Order {
-            order_id: Uuid::new_v4(),
+            order_id: match req.order_id.as_deref() {
+                Some(id) => Uuid::parse_str(id).unwrap_or_else(|_| Uuid::new_v4()),
+                None => Uuid::new_v4(),
+            },
             user_id: req.user_id,
             market_id: req.market_id,
             side: match req.side.as_str() {
@@ -112,6 +115,10 @@ impl MatchingEngine for MatchingEngineService {
                 outcome: outcome_str,
                 trade_type: trade_type_str,
                 timestamp: t.timestamp.to_string(),
+                buyer_order_id: t.buyer_order_id.to_string(),
+                seller_order_id: t.seller_order_id.to_string(),
+                buyer_reservation_id: t.buyer_reservation_id.clone(),
+                seller_reservation_id: t.seller_reservation_id.clone(),
             }
         })
         .collect();
@@ -167,7 +174,48 @@ impl MatchingEngine for MatchingEngineService {
             _ => return Err(Status::invalid_argument("Invalid outcome")),
         };
         let depth = orderbook.get_depth(outcome, 10);
-        Ok(Response::new(GetOrderbookResponse { bids: vec![], asks: vec![] }))
+        Ok(Response::new(GetOrderbookResponse {
+            bids: depth
+                .bids
+                .into_iter()
+                .map(|level| PriceLevel {
+                    price: level.price.to_string(),
+                    quantity: level.quantity.to_string(),
+                })
+                .collect(),
+            asks: depth
+                .asks
+                .into_iter()
+                .map(|level| PriceLevel {
+                    price: level.price.to_string(),
+                    quantity: level.quantity.to_string(),
+                })
+                .collect(),
+        }))
+    }
+
+    async fn cancel_order(
+        &self,
+        request: Request<CancelOrderRequest>,
+    ) -> Result<Response<CancelOrderResponse>, Status> {
+        let req = request.into_inner();
+        let order_id = Uuid::parse_str(&req.order_id)
+            .map_err(|_| Status::invalid_argument("Invalid order_id"))?;
+        let orderbook = self
+            .orderbooks
+            .get(&req.market_id)
+            .ok_or(Status::not_found("Market not found"))?;
+
+        if !orderbook.contains_order(order_id) {
+            return Err(Status::not_found("Order not found"));
+        }
+
+        orderbook.remove_order(order_id);
+
+        Ok(Response::new(CancelOrderResponse {
+            success: true,
+            status: "CANCELLED".to_string(),
+        }))
     }
 }
 

@@ -306,11 +306,21 @@ export class MarketService {
     limit?: number;
     offset?: number;
   }) {
+    const where = filters?.state
+      ? {
+          state: filters.state as any,
+          category: filters?.category,
+        }
+      : {
+          category: filters?.category,
+          OR: [
+            { state: "RESOLVED" as const },
+            { expiresAt: { gt: new Date() } },
+          ],
+        };
+
     return await prisma.market.findMany({
-      where: {
-        state: filters?.state as any,
-        category: filters?.category,
-      },
+      where,
       include: {
         creator: {
           select: {

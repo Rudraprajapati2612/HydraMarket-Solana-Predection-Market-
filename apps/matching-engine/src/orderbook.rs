@@ -7,7 +7,7 @@ use std::collections::{BTreeMap,VecDeque};
 use std::sync::{Arc, RwLock};
 use uuid::Uuid;
 
-use crate::order::{self, Order, OrderSide, Outcome};
+use crate::order::{self, Order, OrderSide, OrderType, Outcome};
 
 type PriceLevel = BTreeMap<Decimal,VecDeque<Order>>;
 
@@ -100,6 +100,10 @@ impl OrderBook{
         }
         
         Some(order)
+    }
+
+    pub fn contains_order(&self, order_id: Uuid) -> bool {
+        self.orders.contains_key(&order_id)
     }
     // get best sell price it means it get Lowest sell price 
     pub fn pop_best_ask(&self,outcome:Outcome) -> Option<Order>{
@@ -259,6 +263,33 @@ impl OrderBook{
         range.any(|(_, orders)| {
             orders.iter().any(|o| o.user_id == user_id)
         })
+    }
+
+    pub fn would_complementary_self_trade(
+        &self,
+        user_id: &str,
+        outcome: Outcome,
+        order_type: OrderType,
+        price: Decimal,
+    ) -> bool {
+        let opposite_bids = match outcome {
+            Outcome::YES => &self.no_bids,
+            Outcome::NO => &self.yes_bids,
+        };
+
+        let book = opposite_bids.read().unwrap();
+
+        match order_type {
+            OrderType::MARKET => book
+                .values()
+                .any(|orders| orders.iter().any(|o| o.user_id == user_id)),
+            OrderType::LIMIT | OrderType::POSTONLY => {
+                let required_price = Decimal::ONE - price;
+                book.get(&required_price)
+                    .map(|orders| orders.iter().any(|o| o.user_id == user_id))
+                    .unwrap_or(false)
+            }
+        }
     }
 
     fn get_bids(&self,outcome:Outcome)->&Arc<RwLock<PriceLevel>>{

@@ -4,6 +4,7 @@ use std::env;
 pub struct Config {
     pub redis_url: String,
     pub grpc_port: u16,
+    pub database_url: String,
 }
 
 impl Config {
@@ -16,6 +17,8 @@ impl Config {
             grpc_port: env::var("GRPC_PORT")
                 .unwrap_or_else(|_| "50052".to_string())
                 .parse()?,
+            database_url: env::var("DATABASE_URL")
+                .expect("DATABASE_URL not set"),
         })
     }
 }

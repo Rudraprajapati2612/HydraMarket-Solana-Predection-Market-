@@ -28,7 +28,8 @@ export interface PlaceOrderRequest{
     order_type : 'MARKET'|'LIMIT'|'POSTONLY',
     price : string,
     quantity : string,
-    reservation_id? : string
+    reservation_id? : string,
+    order_id?: string
 }
 
 
@@ -42,6 +43,10 @@ export interface Trade {
     quantity: string;
     price: string;
     timestamp: string;
+    buyer_order_id: string;
+    seller_order_id: string;
+    buyer_reservation_id?: string;
+    seller_reservation_id?: string;
   }
 
   
@@ -78,10 +83,20 @@ export interface GetOrderbookRequest {
     order_count: number;
   }
   
-  export interface GetOrderbookResponse {
+export interface GetOrderbookResponse {
     bids: PriceLevel[];
     asks: PriceLevel[];
   }
+
+export interface CancelOrderRequest {
+  market_id: string;
+  order_id: string;
+}
+
+export interface CancelOrderResponse {
+  success: boolean;
+  status: string;
+}
 
   export class MatchingEngineClient{
     private client : any;
@@ -116,6 +131,19 @@ export interface GetOrderbookRequest {
               if (error.code !== grpc.status.NOT_FOUND) {
                 console.error('MatchingEngine.GetOrderbook error:', error);
               }
+              reject(error);
+            } else {
+              resolve(response);
+            }
+          });
+        });
+    }
+
+    async cancelOrder(request: CancelOrderRequest): Promise<CancelOrderResponse> {
+        return new Promise((resolve, reject) => {
+          this.client.CancelOrder(request, (error: any, response: CancelOrderResponse) => {
+            if (error) {
+              console.error('MatchingEngine.CancelOrder error:', error);
               reject(error);
             } else {
               resolve(response);

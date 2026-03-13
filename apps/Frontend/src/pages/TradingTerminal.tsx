@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Area, AreaChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ChevronLeft, Moon, Sun } from "lucide-react";
 import toast from "react-hot-toast";
 import { API_BASE_URL } from "../lib/api";
 import { cn } from "../lib/utils";
+import { usePythPrice } from "../hooks/usePythPrice";
 
 interface MarketDetails {
   id: string;
@@ -72,6 +73,9 @@ interface PositionData {
   noTokens: number;
   avgYesPrice: number | null;
   avgNoPrice: number | null;
+  marketState?: string;
+  marketOutcome?: string | null;
+  isClaimed?: boolean;
   pendingPayout?: number | null;
 }
 
@@ -90,6 +94,16 @@ const formatUsd = (value: number) =>
     maximumFractionDigits: 2,
   }).format(value);
 
+const extractThresholdFromQuestion = (question: string) => {
+  const match = question.match(/\$?(\d+(?:,\d{3})*(?:\.\d+)?)(k)?/i);
+  if (!match) return null;
+
+  const value = Number(match[1].replace(/,/g, ""));
+  if (Number.isNaN(value)) return null;
+
+  return match[2] ? value * 1000 : value;
+};
+
 const TradingTerminal: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -98,6 +112,7 @@ const TradingTerminal: React.FC = () => {
   const [tradeAction, setTradeAction] = useState<"buy" | "sell">("buy");
   const [orderType, setOrderType] = useState<"limit" | "market">("limit");
   const [activeBottomTab, setActiveBottomTab] = useState<"orders" | "history" | "summary">("orders");
+  const [chartMode, setChartMode] = useState<"token" | "btc">("token");
   const [orderBookSide, setOrderBookSide] = useState<"yes" | "no">("yes");
   const [marketAmount, setMarketAmount] = useState("");
   const [limitPrice, setLimitPrice] = useState("");
@@ -117,6 +132,7 @@ const TradingTerminal: React.FC = () => {
   const [error, setError] = useState("");
 
   const token = localStorage.getItem("token");
+  const { current: btcPrice, isConnected, priceHistory } = usePythPrice();
 
   const loadTradingData = async (showLoader = false) => {
     if (!id) return;
@@ -138,7 +154,6 @@ const TradingTerminal: React.FC = () => {
       const authenticatedRequests = token
         ? [
             fetch(`${API_BASE_URL}/orders?marketId=${id}`, { headers: authHeaders }),
-            fetch(`${API_BASE_URL}/orders/trades?marketId=${id}&limit=50`, { headers: authHeaders }),
             fetch(`${API_BASE_URL}/markets/${id}/positions`, { headers: authHeaders }),
             fetch(`${API_BASE_URL}/balance`, { headers: authHeaders }),
           ]
@@ -155,7 +170,6 @@ const TradingTerminal: React.FC = () => {
         yesOrderbookPayload,
         noOrderbookPayload,
         ordersPayload,
-        userTradesPayload,
         positionPayload,
         balancePayload,
       ] = payloads;
@@ -168,17 +182,28 @@ const TradingTerminal: React.FC = () => {
       setChartTrades(tradesPayload?.success ? tradesPayload.data : []);
       setYesOrderbook(yesOrderbookPayload?.success ? yesOrderbookPayload.data : { bids: [], asks: [] });
       setNoOrderbook(noOrderbookPayload?.success ? noOrderbookPayload.data : { bids: [], asks: [] });
+      setTradeHistory(
+        tradesPayload?.success
+          ? tradesPayload.data.map((trade: any) => ({
+              id: trade.id,
+              role: trade.side,
+              outcome: trade.outcome,
+              quantity: trade.amount,
+              price: trade.price,
+              total: Number(trade.amount) * Number(trade.price),
+              timestamp: trade.timestamp,
+            }))
+          : []
+      );
 
       if (token) {
         setOrders(ordersPayload?.success ? ordersPayload.data : []);
-        setTradeHistory(userTradesPayload?.success ? userTradesPayload.data : []);
         setPosition(positionPayload?.success ? positionPayload.data : null);
 
         const usdcLedger = (balancePayload?.data as BalanceRow[] | undefined)?.find((entry) => entry.asset === "USDC");
         setBalance(usdcLedger ? toNumber(usdcLedger.available) + toNumber(usdcLedger.reserved) : 0);
       } else {
         setOrders([]);
-        setTradeHistory([]);
         setPosition(null);
         setBalance(0);
       }
@@ -208,10 +233,13 @@ const TradingTerminal: React.FC = () => {
   }, [id, token]);
 
   useEffect(() => {
-    if (price?.yes?.midPrice !== null && price?.yes?.midPrice !== undefined) {
-      setLimitPrice((price.yes.midPrice * 100).toFixed(2));
+    const defaultPrice = price?.yes?.midPrice ?? price?.yes?.bestAsk ?? price?.yes?.bestBid;
+    if (defaultPrice !== null && defaultPrice !== undefined) {
+      setLimitPrice((defaultPrice * 100).toFixed(2));
+    } else {
+      setLimitPrice("50.00");
     }
-  }, [price?.yes?.midPrice]);
+  }, [price?.yes?.bestAsk, price?.yes?.bestBid, price?.yes?.midPrice]);
 
   const livePrice = useMemo(() => {
     if (!price) return 50;
@@ -219,7 +247,17 @@ const TradingTerminal: React.FC = () => {
     return Number(((yesMid ?? 0.5) * 100).toFixed(2));
   }, [price]);
 
+  const marketThreshold = useMemo(
+    () => (market ? extractThresholdFromQuestion(market.question) : null),
+    [market]
+  );
+
   const selectedSidePrice = tradeSide === "yes" ? livePrice : 100 - livePrice;
+  const isMarketOpen = market?.state === "OPEN";
+  const visibleOrders = useMemo(
+    () => orders.filter((order) => ["OPEN", "PARTIAL", "MATCHED", "PENDING"].includes(order.status)),
+    [orders]
+  );
 
   const activeOrderbook = orderBookSide === "yes" ? yesOrderbook : noOrderbook;
   const orderBookData = useMemo(() => {
@@ -253,6 +291,11 @@ const TradingTerminal: React.FC = () => {
       }));
   }, [chartTrades]);
 
+  const btcChartData = useMemo(
+    () => priceHistory.map((point) => ({ timestamp: point.timestamp, price: point.price })),
+    [priceHistory]
+  );
+
   const totalCost = useMemo(() => {
     if (orderType === "market") {
       return toNumber(marketAmount);
@@ -280,9 +323,38 @@ const TradingTerminal: React.FC = () => {
     };
   }, [position, tradeSide, livePrice]);
 
+  const handleClaimPayout = async () => {
+    if (!id || !token) {
+      navigate("/login");
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/payouts/claim/${id}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.message || data?.error || "Claim failed");
+      }
+      toast.success(`Claimed ${formatUsd(Number(data.data?.payout ?? 0))}`);
+      loadTradingData(false);
+    } catch (err: any) {
+      toast.error(err.message || "Claim failed");
+    }
+  };
+
   const handlePlaceOrder = async () => {
     if (!id || !token) {
       navigate("/login");
+      return;
+    }
+
+    if (!isMarketOpen) {
+      toast.error("Trading is closed for this market");
       return;
     }
 
@@ -396,6 +468,18 @@ const TradingTerminal: React.FC = () => {
             <span className={isDarkMode ? "text-white/40" : "text-slate-500"}>VOL:</span>
             <span className="font-bold text-cyan-400">{formatUsd(toNumber(stats?.totalVolume))}</span>
           </div>
+          {btcPrice ? (
+            <>
+              <div className={cn("h-4 w-[1px] shrink-0", isDarkMode ? "bg-white/10" : "bg-slate-200")} />
+              <div className="flex items-center gap-2 shrink-0">
+                <div className={cn("w-1.5 h-1.5 rounded-full", isConnected ? "bg-emerald-500 animate-pulse" : "bg-rose-500")} />
+                <span className={isDarkMode ? "text-white/40" : "text-slate-500"}>BTC/USD:</span>
+                <span className="font-bold text-amber-400">
+                  {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(btcPrice)}
+                </span>
+              </div>
+            </>
+          ) : null}
         </div>
         <button onClick={() => navigate("/portfolio")} className="hidden sm:flex items-center gap-2 group cursor-pointer">
           <span className={cn("uppercase transition-colors", isDarkMode ? "text-white/40 group-hover:text-white/60" : "text-slate-500 group-hover:text-slate-700")}>Balance:</span>
@@ -460,6 +544,12 @@ const TradingTerminal: React.FC = () => {
               ))}
             </div>
 
+            {orderBookData.asks.length === 0 && orderBookData.bids.length === 0 ? (
+              <div className={cn("py-8 text-center text-[9px] font-mono uppercase tracking-widest whitespace-pre-line", isDarkMode ? "text-white/20" : "text-slate-400")}>
+                {market.state === "RESOLVED" ? "> MARKET_CLOSED\n  NO_ACTIVE_ORDERS" : "> AWAITING_ORDERS"}
+              </div>
+            ) : null}
+
             <div className={cn("my-4 py-3 px-4 border-y flex items-center justify-between rounded", isDarkMode ? "border-white/5 bg-[#1a1a2e]/40" : "border-border-gray bg-slate-100")}>
               <div className="text-2xl font-bold tracking-tighter text-cyan-400">{selectedSidePrice.toFixed(1)}¢</div>
               <div className="text-right text-[10px] font-mono">
@@ -482,11 +572,16 @@ const TradingTerminal: React.FC = () => {
         </div>
 
         <div className={cn("md:col-span-6 flex flex-col min-h-[300px] md:min-h-0 transition-colors", isDarkMode ? "bg-[#050505] border-x border-white/5" : "bg-white border-x border-border-gray")}>
-          <div className={cn("px-4 py-3 border-b text-[10px] font-bold uppercase tracking-widest", isDarkMode ? "border-white/5 text-cyan-400" : "border-border-gray text-cyan-600")}>
-            Price_History
+          <div className={cn("px-4 border-b flex items-center gap-6 text-[10px] font-bold uppercase tracking-widest", isDarkMode ? "border-white/5" : "border-border-gray")}>
+            <button onClick={() => setChartMode("token")} className={cn("py-3", chartMode === "token" ? "text-cyan-400" : isDarkMode ? "text-white/40" : "text-slate-400")}>
+              Price_History
+            </button>
+            <button onClick={() => setChartMode("btc")} className={cn("py-3", chartMode === "btc" ? "text-amber-400" : isDarkMode ? "text-white/40" : "text-slate-400")}>
+              BTC/USD_LIVE
+            </button>
           </div>
           <div className="flex-1 relative p-4 sm:p-8 overflow-hidden">
-            {chartData.length > 0 ? (
+            {chartMode === "token" && chartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={chartData}>
                   <XAxis dataKey="timestamp" tickFormatter={(value) => new Date(value).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} tick={{ fill: isDarkMode ? "#475569" : "#94a3b8", fontSize: 10 }} axisLine={false} tickLine={false} />
@@ -503,13 +598,50 @@ const TradingTerminal: React.FC = () => {
                   <Area type="monotone" dataKey="price" stroke="#00d4ff" fill="rgba(0,212,255,0.2)" />
                 </AreaChart>
               </ResponsiveContainer>
+            ) : chartMode === "btc" && btcChartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={btcChartData}>
+                  <XAxis dataKey="timestamp" tickFormatter={(value) => new Date(value).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} tick={{ fill: isDarkMode ? "#475569" : "#94a3b8", fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <YAxis tickFormatter={(value) => `$${Number(value).toLocaleString("en-US", { maximumFractionDigits: 0 })}`} tick={{ fill: isDarkMode ? "#475569" : "#94a3b8", fontSize: 10 }} axisLine={false} tickLine={false} orientation="right" width={84} />
+                  <Tooltip
+                    formatter={(value: number) => [new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(value), "BTC/USD"]}
+                    labelFormatter={(value) => new Date(value).toLocaleString()}
+                    contentStyle={{
+                      background: isDarkMode ? "#0f0f1a" : "#ffffff",
+                      border: isDarkMode ? "1px solid #1e1e2e" : "1px solid #e2e8f0",
+                      borderRadius: "4px",
+                    }}
+                  />
+                  {marketThreshold ? <ReferenceLine y={marketThreshold} stroke="#f59e0b" strokeDasharray="4 4" /> : null}
+                  <Area type="monotone" dataKey="price" stroke="#f59e0b" fill="rgba(245,158,11,0.16)" />
+                </AreaChart>
+              </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center text-[10px] font-mono uppercase tracking-widest text-cyan-400">NO_TRADE_HISTORY_YET</div>
+              <div className={cn("h-full flex items-center justify-center text-[10px] font-mono uppercase tracking-widest", chartMode === "btc" ? "text-amber-400" : "text-cyan-400")}>
+                {chartMode === "btc" ? "NO_BTC_PRICE_FEED" : "NO_TRADE_HISTORY_YET"}
+              </div>
             )}
           </div>
         </div>
 
         <div className={cn("md:col-span-3 p-4 sm:p-6 flex flex-col gap-6 border-t md:border-t-0 transition-colors", isDarkMode ? "bg-[#050505] border-white/5" : "bg-white border-border-gray")}>
+          {!isMarketOpen ? (
+            <div className={cn("border rounded-lg p-4 text-center", isDarkMode ? "border-amber-500/20 bg-amber-500/5" : "border-amber-200 bg-amber-50")}>
+              <div className="text-amber-400 text-[10px] font-mono uppercase tracking-widest font-bold">
+                {market.state === "RESOLVED" ? "MARKET_RESOLVED" : "TRADING_CLOSED"}
+              </div>
+              <div className={cn("text-[9px] font-mono mt-1 uppercase", isDarkMode ? "text-white/40" : "text-slate-500")}>
+                Trading closed - outcome: {market.outcome ?? "PENDING"}
+              </div>
+              {position?.pendingPayout && position.pendingPayout > 0 ? (
+                <button onClick={handleClaimPayout} className="mt-3 w-full py-2 bg-emerald-500 text-black text-[10px] font-black uppercase rounded-lg">
+                  Claim {formatUsd(position.pendingPayout)}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className={cn(!isMarketOpen && "opacity-30 pointer-events-none")}>
           <div className={cn("grid grid-cols-2 gap-2 p-1 rounded-xl border transition-colors", isDarkMode ? "bg-white/5 border-white/10" : "bg-slate-100 border-border-gray")}>
             <button onClick={() => setTradeAction("buy")} className={cn("py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all", tradeAction === "buy" ? "bg-[#141420] border-b-2 border-cyan-400 text-white shadow-lg" : "bg-transparent text-[#475569]")}>Buy</button>
             <button onClick={() => setTradeAction("sell")} className={cn("py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all", tradeAction === "sell" ? "bg-[#141420] border-b-2 border-rose-400 text-white shadow-lg" : "bg-transparent text-[#475569]")}>Sell</button>
@@ -580,15 +712,25 @@ const TradingTerminal: React.FC = () => {
                     <span className={isDarkMode ? "text-white/40" : "text-slate-500"}>AVG_ENTRY:</span>
                     <span className={cn("font-bold", isDarkMode ? "text-white" : "text-slate-900")}>{positionSummary.avgEntryPrice !== null ? `${positionSummary.avgEntryPrice.toFixed(2)}¢` : "--"}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className={isDarkMode ? "text-white/40" : "text-slate-500"}>UNREALIZED_PNL:</span>
-                    <span className={cn("font-bold", positionSummary.unrealizedPnL >= 0 ? "text-emerald-500" : "text-rose-500")}>{formatUsd(positionSummary.unrealizedPnL)}</span>
-                  </div>
+                  {market.state === "RESOLVED" ? (
+                    <div className="flex justify-between">
+                      <span className={isDarkMode ? "text-white/40" : "text-slate-500"}>STATUS:</span>
+                      <span className="font-bold text-amber-400">
+                        {position?.pendingPayout && position.pendingPayout > 0 ? `CLAIM ${formatUsd(position.pendingPayout)}` : "POSITION_CLOSED"}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between">
+                      <span className={isDarkMode ? "text-white/40" : "text-slate-500"}>UNREALIZED_PNL:</span>
+                      <span className={cn("font-bold", positionSummary.unrealizedPnL >= 0 ? "text-emerald-500" : "text-rose-500")}>{formatUsd(positionSummary.unrealizedPnL)}</span>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className={cn("text-[10px] uppercase tracking-widest", isDarkMode ? "text-white/20" : "text-slate-400")}>&gt; NO_POSITION</div>
               )}
             </div>
+          </div>
           </div>
         </div>
       </div>
@@ -597,7 +739,7 @@ const TradingTerminal: React.FC = () => {
         <div className={cn("flex flex-col sm:flex-row items-start sm:items-center justify-between px-4 sm:px-6 border-b gap-2", isDarkMode ? "border-white/5" : "border-border-gray")}>
           <div className="flex items-center gap-4 sm:gap-8 overflow-x-auto no-scrollbar w-full sm:w-auto">
             <button onClick={() => setActiveBottomTab("orders")} className={cn("py-4 text-[10px] font-bold uppercase tracking-widest", activeBottomTab === "orders" ? "text-cyan-400" : isDarkMode ? "text-white/40" : "text-slate-400")}>
-              Open_Orders ({orders.length})
+              Open_Orders ({visibleOrders.length})
             </button>
             <button onClick={() => setActiveBottomTab("history")} className={cn("py-4 text-[10px] font-bold uppercase tracking-widest", activeBottomTab === "history" ? "text-cyan-400" : isDarkMode ? "text-white/40" : "text-slate-400")}>
               Trade_History ({tradeHistory.length})
@@ -622,10 +764,10 @@ const TradingTerminal: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="text-[11px] font-mono">
-                {orders.length === 0 ? (
+                {visibleOrders.length === 0 ? (
                   <tr><td colSpan={6} className={cn("py-12 text-center uppercase tracking-widest", isDarkMode ? "text-white/20" : "text-slate-400")}>&gt; NO_OPEN_ORDERS</td></tr>
                 ) : (
-                  orders.map((order) => {
+                  visibleOrders.map((order) => {
                     const quantity = toNumber(order.quantity);
                     const filledQuantity = toNumber(order.filledQuantity);
                     const fillPercent = quantity > 0 ? Math.round((filledQuantity / quantity) * 100) : 0;

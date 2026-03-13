@@ -163,20 +163,18 @@ async fn process_settlement(
         no_amount,
     ).await?;
     
-    // 8. Mark orders as FILLED
+    // 8. Increment order fill state using the settled pair quantity
+    let fill_quantity = request.pairs.parse()?;
+
     let yes_order_id = request
         .yes_reservation_id
         .as_deref()
         .filter(|s| !s.is_empty())
         .or(request.yes_order_id.as_deref().filter(|s| !s.is_empty()));
     if let Some(yes_order_id) = yes_order_id {
-        let updated = database.mark_order_filled(yes_order_id).await?;
-        if !updated {
-            warn!(
-                "Order {} not found for settlement {}, skipping YES order fill update",
-                yes_order_id, settlement_id
-            );
-        }
+        database
+            .increment_filled_quantity(yes_order_id, fill_quantity)
+            .await?;
     } else {
         warn!(
             "Missing YES canonical order id (yes_reservation_id/yes_order_id) for settlement {}, skipping order fill update",
@@ -190,13 +188,9 @@ async fn process_settlement(
         .filter(|s| !s.is_empty())
         .or(request.no_order_id.as_deref().filter(|s| !s.is_empty()));
     if let Some(no_order_id) = no_order_id {
-        let updated = database.mark_order_filled(no_order_id).await?;
-        if !updated {
-            warn!(
-                "Order {} not found for settlement {}, skipping NO order fill update",
-                no_order_id, settlement_id
-            );
-        }
+        database
+            .increment_filled_quantity(no_order_id, fill_quantity)
+            .await?;
     } else {
         warn!(
             "Missing NO canonical order id (no_reservation_id/no_order_id) for settlement {}, skipping order fill update",

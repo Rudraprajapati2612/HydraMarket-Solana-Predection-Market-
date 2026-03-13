@@ -4,6 +4,7 @@ package matching_engine;
 service MatchingEngine {
   rpc PlaceOrder(PlaceOrderRequest) returns (PlaceOrderResponse);
   rpc GetOrderbook(GetOrderbookRequest) returns (GetOrderbookResponse);
+  rpc CancelOrder(CancelOrderRequest) returns (CancelOrderResponse);
 }
 
 message PlaceOrderRequest {
@@ -15,6 +16,7 @@ message PlaceOrderRequest {
   string price = 6;
   string quantity = 7;
   optional string reservation_id = 8;
+  optional string order_id = 10;
 }
 
 message PlaceOrderResponse {
@@ -34,6 +36,10 @@ message Trade {
   string outcome = 7;
   string trade_type = 8;
   string timestamp = 9;
+  string buyer_order_id = 10;
+  string seller_order_id = 11;
+  optional string buyer_reservation_id = 12;
+  optional string seller_reservation_id = 13;
 }
 
 message ComplementaryMatch {
@@ -64,4 +70,14 @@ message GetOrderbookResponse {
 message PriceLevel {
   string price = 1;
   string quantity = 2;
+}
+
+message CancelOrderRequest {
+  string market_id = 1;
+  string order_id = 2;
+}
+
+message CancelOrderResponse {
+  bool success = 1;
+  string status = 2;
 }

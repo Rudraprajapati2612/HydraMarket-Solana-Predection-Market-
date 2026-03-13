@@ -26,7 +26,6 @@ impl Matcher {
         
         // 1. Validate order
         self.validate_order(&order)?;
-        print!("Hi there");
 
 
         // 2. Check for self-trade
@@ -39,6 +38,21 @@ impl Matcher {
             warn!("Self-trade detected for user {}", order.user_id);
             return Err(anyhow::anyhow!("Self-trade not allowed"));
         }
+
+        if order.side == OrderSide::BUY
+            && self.orderbook.would_complementary_self_trade(
+                &order.user_id,
+                order.outcome,
+                order.order_type,
+                order.price,
+            )
+        {
+            warn!(
+                "Complementary self-trade detected for user {}",
+                order.user_id
+            );
+            return Err(anyhow::anyhow!("Self-trade not allowed"));
+        }
         
         // 3. Try to match order
         let mut trades = Vec::new();
@@ -47,7 +61,7 @@ impl Matcher {
         match order.order_type {
             OrderType::MARKET => {
                 // Match immediately at best available price
-                self.match_market_order(&mut order, &mut trades)?;
+                self.match_market_order(&mut order, &mut trades, &mut complementary_matches)?;
             }
             OrderType::LIMIT => {
                 // Try to match, add remainder to book
@@ -60,7 +74,7 @@ impl Matcher {
         }
         
         // 4. Add remaining quantity to orderbook
-        if order.remaining() > Decimal::ZERO && !order.is_filled() {
+        if order.remaining() > Decimal::ZERO && !order.is_filled() && order.order_type != OrderType::MARKET {
             order.order_status = if order.filled > Decimal::ZERO {
                 OrderStatus::PARTIAL
             } else {
@@ -70,6 +84,8 @@ impl Matcher {
             self.orderbook.add_order(order.clone());
         } else if order.is_filled() {
             order.order_status = OrderStatus::FILLED;
+        } else if order.filled > Decimal::ZERO {
+            order.order_status = OrderStatus::PARTIAL;
         }
         
         Ok(MatchResult {
@@ -80,7 +96,12 @@ impl Matcher {
     }
     
     /// Match a MARKET order (execute immediately at best price)
-    fn match_market_order(&self, order: &mut Order, trades: &mut Vec<Trade>) -> Result<()> {
+    fn match_market_order(
+        &self,
+        order: &mut Order,
+        trades: &mut Vec<Trade>,
+        complementary: &mut Vec<ComplementaryMatch>,
+    ) -> Result<()> {
         while order.remaining() > Decimal::ZERO {
             // ✅ CORRECT: Use best_bid/best_ask methods
             let best_price = match order.side {
@@ -93,7 +114,12 @@ impl Matcher {
                     self.execute_trade_at_price(order, price, trades)?;
                 }
                 None => {
-                    // No liquidity available
+                    if order.side == OrderSide::BUY
+                        && self.match_market_complementary_order(order, complementary)?
+                    {
+                        continue;
+                    }
+
                     warn!("No liquidity for market order: {}", order.order_id);
                     break;
                 }
@@ -151,15 +177,14 @@ impl Matcher {
     }
     
     /// Try to match with a complementary order (BUY YES + BUY NO = mint pair)
-    /// Try to match with a complementary order (BUY YES + BUY NO = mint pair)
-fn try_complementary_match(
-    &self,
-    order: &mut Order,
-    matches: &mut Vec<ComplementaryMatch>,
-) -> Result<()> {
-    if order.side != OrderSide::BUY {
-        return Ok(());
-    }
+    fn try_complementary_match(
+        &self,
+        order: &mut Order,
+        matches: &mut Vec<ComplementaryMatch>,
+    ) -> Result<()> {
+        if order.side != OrderSide::BUY {
+            return Ok(());
+        }
     
     // Get opposite outcome
     let opposite_outcome = match order.outcome {
@@ -181,9 +206,10 @@ fn try_complementary_match(
     let required_price = Decimal::ONE - our_price;
     
     // Collect order IDs to process (not full orders!)
-    let mut order_ids_to_match: Vec<Uuid> = book
-        .range(required_price..)
-        .flat_map(|(_, orders)| orders.iter().map(|o| o.order_id))
+    let order_ids_to_match: Vec<Uuid> = book
+        .get(&required_price)
+        .into_iter()
+        .flat_map(|orders| orders.iter().map(|o| o.order_id))
         .collect();
     
     // Release read lock IMMEDIATELY
@@ -200,7 +226,16 @@ fn try_complementary_match(
             Some(o) => o.clone(),
             None => continue, // Order was already removed
         };
-        
+
+        if opposite_order.user_id == order.user_id {
+            warn!(
+                "Skipping complementary self-match for user {} on order {}",
+                order.user_id,
+                order.order_id
+            );
+            continue;
+        }
+
         if opposite_order.is_filled() {
             continue; // Skip already filled orders
         }
@@ -209,25 +244,37 @@ fn try_complementary_match(
         let matched_qty = order.remaining().min(opposite_order.remaining());
         
         // Create complementary match
-        let (yes_buyer, no_buyer, yes_order, no_order, yes_price, no_price) = 
-            match order.outcome {
-                Outcome::YES => (
-                    order.user_id.clone(),
-                    opposite_order.user_id.clone(),
-                    order.order_id,
-                    opposite_order.order_id,
-                    order.price,
-                    opposite_order.price,
-                ),
-                Outcome::NO => (
-                    opposite_order.user_id.clone(),
-                    order.user_id.clone(),
-                    opposite_order.order_id,
-                    order.order_id,
-                    opposite_order.price,
-                    order.price,
-                ),
-            };
+        let (
+            yes_buyer,
+            no_buyer,
+            yes_order,
+            no_order,
+            yes_price,
+            no_price,
+            yes_reservation_id,
+            no_reservation_id,
+        ) = match order.outcome {
+            Outcome::YES => (
+                order.user_id.clone(),
+                opposite_order.user_id.clone(),
+                order.order_id,
+                opposite_order.order_id,
+                order.price,
+                opposite_order.price,
+                order.reservation_id.clone(),
+                opposite_order.reservation_id.clone(),
+            ),
+            Outcome::NO => (
+                opposite_order.user_id.clone(),
+                order.user_id.clone(),
+                opposite_order.order_id,
+                order.order_id,
+                opposite_order.price,
+                order.price,
+                opposite_order.reservation_id.clone(),
+                order.reservation_id.clone(),
+            ),
+        };
         
         matches.push(ComplementaryMatch {
             trade_id: Uuid::new_v4(),
@@ -239,8 +286,8 @@ fn try_complementary_match(
             no_price,
             yes_order_id: yes_order,
             no_order_id: no_order,
-            yes_reservation_id: order.reservation_id.clone(),
-            no_reservation_id: opposite_order.reservation_id.clone(),
+            yes_reservation_id,
+            no_reservation_id,
             timestamp: Utc::now(),
         });
         
@@ -295,8 +342,151 @@ fn try_complementary_match(
         );
     }
     
-    Ok(())
-}
+        Ok(())
+    }
+
+    fn match_market_complementary_order(
+        &self,
+        order: &mut Order,
+        matches: &mut Vec<ComplementaryMatch>,
+    ) -> Result<bool> {
+        if order.side != OrderSide::BUY {
+            return Ok(false);
+        }
+
+        let opposite_outcome = match order.outcome {
+            Outcome::YES => Outcome::NO,
+            Outcome::NO => Outcome::YES,
+        };
+
+        let opposite_bids = match opposite_outcome {
+            Outcome::YES => &self.orderbook.yes_bids,
+            Outcome::NO => &self.orderbook.no_bids,
+        };
+
+        let order_ids_to_match: Vec<Uuid> = {
+            let book = opposite_bids.read().unwrap();
+            book.iter()
+                .rev()
+                .flat_map(|(_, orders)| orders.iter().map(|o| o.order_id))
+                .collect()
+        };
+
+        let mut matched_any = false;
+
+        for order_id in order_ids_to_match {
+            if order.remaining() == Decimal::ZERO {
+                break;
+            }
+
+            let opposite_order = match self.orderbook.orders.get(&order_id) {
+                Some(existing) => existing.clone(),
+                None => continue,
+            };
+
+            if opposite_order.user_id == order.user_id {
+                warn!(
+                    "Skipping market complementary self-match for user {} on order {}",
+                    order.user_id,
+                    order.order_id
+                );
+                continue;
+            }
+
+            if opposite_order.is_filled() {
+                continue;
+            }
+
+            let matched_qty = order.remaining().min(opposite_order.remaining());
+            let opposite_price = opposite_order.price;
+
+            let (
+                yes_buyer,
+                no_buyer,
+                yes_order,
+                no_order,
+                yes_price,
+                no_price,
+                yes_reservation_id,
+                no_reservation_id,
+            ) =
+                match order.outcome {
+                    Outcome::YES => (
+                        order.user_id.clone(),
+                        opposite_order.user_id.clone(),
+                        order.order_id,
+                        opposite_order.order_id,
+                        Decimal::ONE - opposite_price,
+                        opposite_price,
+                        order.reservation_id.clone(),
+                        opposite_order.reservation_id.clone(),
+                    ),
+                    Outcome::NO => (
+                        opposite_order.user_id.clone(),
+                        order.user_id.clone(),
+                        opposite_order.order_id,
+                        order.order_id,
+                        opposite_price,
+                        Decimal::ONE - opposite_price,
+                        opposite_order.reservation_id.clone(),
+                        order.reservation_id.clone(),
+                    ),
+                };
+
+            matches.push(ComplementaryMatch {
+                trade_id: Uuid::new_v4(),
+                market_id: order.market_id.clone(),
+                yes_buyer_id: yes_buyer,
+                no_buyer_id: no_buyer,
+                quantity: matched_qty,
+                yes_price,
+                no_price,
+                yes_order_id: yes_order,
+                no_order_id: no_order,
+                yes_reservation_id,
+                no_reservation_id,
+                timestamp: Utc::now(),
+            });
+
+            order.filled += matched_qty;
+            matched_any = true;
+
+            if opposite_order.filled + matched_qty >= opposite_order.quantity {
+                self.orderbook.remove_order(opposite_order.order_id);
+            } else {
+                if let Some(mut stored) = self.orderbook.orders.get_mut(&opposite_order.order_id) {
+                    stored.filled += matched_qty;
+                }
+
+                let bids = match opposite_outcome {
+                    Outcome::YES => &self.orderbook.yes_bids,
+                    Outcome::NO => &self.orderbook.no_bids,
+                };
+
+                let mut book = bids.write().unwrap();
+                if let Some(orders_at_price) = book.get_mut(&opposite_price) {
+                    for order_in_queue in orders_at_price.iter_mut() {
+                        if order_in_queue.order_id == opposite_order.order_id {
+                            order_in_queue.filled += matched_qty;
+                            break;
+                        }
+                    }
+
+                    if orders_at_price.is_empty() {
+                        book.remove(&opposite_price);
+                    }
+                }
+            }
+
+            info!(
+                "Market complementary match: {} YES + {} NO = {} pairs",
+                yes_price, no_price, matched_qty
+            );
+        }
+
+        Ok(matched_any)
+    }
+
     /// Execute a trade at a specific price
     fn execute_trade_at_price(
         &self,

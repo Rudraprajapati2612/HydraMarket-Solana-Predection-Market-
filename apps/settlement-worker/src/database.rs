@@ -10,6 +10,12 @@ pub struct Database {
     client: Arc<Mutex<Client>>,
 }
 
+pub enum OrderFillUpdate {
+    FilledNow,
+    AlreadyFilled,
+    NotFound,
+}
+
 impl Database {
     pub async fn connect(database_url: &str) -> Result<Self> {
         let (client, connection) = tokio_postgres::connect(database_url, NoTls).await?;
@@ -225,36 +231,44 @@ impl Database {
         Ok(())
     }
     
-    /// Mark a single order as FILLED.
-    /// Returns `Ok(true)` if a row was updated, `Ok(false)` if not found.
-pub async fn mark_order_filled(
-    &self,
-    order_id: &str,
-) -> Result<bool> {
-    let client = self.client.lock().await;
+    /// Mark a single order as FILLED if it is not already FILLED.
+    pub async fn mark_order_filled(
+        &self,
+        order_id: &str,
+    ) -> Result<OrderFillUpdate> {
+        let client = self.client.lock().await;
 
-    let rows = client
-        .execute(
-            r#"
-            UPDATE orders
-            SET 
-                status = 'FILLED',
-                filled_quantity = quantity,
-                updated_at = NOW()
-            WHERE id = $1
-            "#,
-            &[&order_id],
-        )
-        .await?;
+        let current_status = client
+            .query_opt("SELECT status::text FROM orders WHERE id = $1", &[&order_id])
+            .await?;
 
-    if rows == 0 {
-        return Ok(false);
+        let Some(row) = current_status else {
+            return Ok(OrderFillUpdate::NotFound);
+        };
+
+        let status: String = row.get(0);
+        if status == "FILLED" {
+            return Ok(OrderFillUpdate::AlreadyFilled);
+        }
+
+        client
+            .execute(
+                r#"
+                UPDATE orders
+                SET
+                    status = 'FILLED',
+                    filled_quantity = quantity,
+                    updated_at = NOW()
+                WHERE id = $1
+                "#,
+                &[&order_id],
+            )
+            .await?;
+
+        info!("✅ Order {} marked as FILLED", order_id);
+
+        Ok(OrderFillUpdate::FilledNow)
     }
-
-    info!("✅ Order {} marked as FILLED", order_id);
-
-    Ok(true)
-}
 
 /// Increment filled quantity and auto-update status
 pub async fn increment_filled_quantity(
@@ -269,11 +283,11 @@ pub async fn increment_filled_quantity(
             r#"
             UPDATE orders
             SET 
-                filled_quantity = COALESCE(filled_quantity, 0) + $2,
+                filled_quantity = LEAST(quantity, COALESCE(filled_quantity, 0) + $2),
                 status = CASE 
                     WHEN COALESCE(filled_quantity, 0) + $2 >= quantity
                     THEN 'FILLED'
-                    ELSE 'PARTIALLY_FILLED'
+                    ELSE 'PARTIAL'
                 END,
                 updated_at = NOW()
             WHERE id = $1

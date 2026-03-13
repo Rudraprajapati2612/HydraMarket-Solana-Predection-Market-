@@ -42,5 +42,8 @@ chrono = { version = "0.4", features = ["serde"] }
 rust_decimal = { version = "1.33", features = ["serde"] }
 rust_decimal_macros = "1.40.0"
 
+# Database
+tokio-postgres = { version = "0.7", features = ["with-chrono-0_4", "with-uuid-1"] }
+
 [build-dependencies]
 tonic-build = "0.11"

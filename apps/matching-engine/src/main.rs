@@ -11,8 +11,10 @@ mod matcher;
 mod trade;
 mod redis_client;
 mod grpc_server;
+mod database;
 
 use config::Config;
+use database::Database;
 use orderbook::OrderBook;
 use redis_client::RedisClient;
 use grpc_server::start_grpc_server;
@@ -33,9 +35,24 @@ async fn main() -> Result<()> {
     let redis = Arc::new(RedisClient::new(&config.redis_url)?);
     redis.ping().await?;
     info!("✅ Redis connected: {}", config.redis_url);
+
+    // Initialize database for startup replay
+    let database = Database::connect(&config.database_url).await?;
     
     // Create orderbooks (shared state)
     let orderbooks: Arc<DashMap<String, Arc<OrderBook>>> = Arc::new(DashMap::new());
+
+    // Restore resting orders into memory before serving traffic
+    let resting_orders = database.load_resting_orders().await?;
+    for record in resting_orders {
+        let market_id = record.order.market_id.clone();
+        let orderbook = orderbooks
+            .entry(market_id.clone())
+            .or_insert_with(|| Arc::new(OrderBook::new(market_id)))
+            .clone();
+        orderbook.add_order(record.order);
+    }
+    info!("✅ Restored orderbooks from database");
     
     info!("✅ Matching engine ready");
     

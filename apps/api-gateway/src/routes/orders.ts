@@ -130,55 +130,25 @@ export const orderRoutes = new Elysia({prefix:'/orders'})
         if (!user) {
           throw new AppError('Unauthorized', 401, 'UNAUTHORIZED');
         }
-
-        const order = await prisma.order.findFirst({
-          where: {
-            id: params.id,
+        try {
+          const result = await orderService.cancelOrder({
             userId: user.userId,
-          },
-        });
-
-        if (!order) {
-          throw new AppError('Order not found', 404, 'ORDER_NOT_FOUND');
-        }
-
-        if (order.status === 'FILLED' || order.status === 'CANCELLED') {
-          throw new AppError('Order cannot be cancelled', 400, 'ORDER_NOT_CANCELLABLE');
-        }
-
-        const filledAmount = Number(order.filledQuantity) * Number(order.price);
-        const releasableAmount = Math.max(0, Number(order.amount) - filledAmount);
-
-        await prisma.$transaction(async (tx) => {
-          if (order.side === 'BUY' && releasableAmount > 0) {
-            await tx.ledger.update({
-              where: {
-                userId_asset: {
-                  userId: user.userId,
-                  asset: 'USDC',
-                },
-              },
-              data: {
-                reserved: { decrement: releasableAmount },
-                available: { increment: releasableAmount },
-              },
-            });
-          }
-
-          await tx.order.update({
-            where: { id: order.id },
-            data: { status: 'CANCELLED' },
+            orderId: params.id,
           });
-        });
 
-        return {
-          success: true,
-          data: {
-            orderId: order.id,
-            status: 'CANCELLED',
-            releasedAmount: releasableAmount,
-          },
-        };
+          return {
+            success: true,
+            data: result,
+          };
+        } catch (error: any) {
+          if (error?.message === 'ORDER_NOT_FOUND') {
+            throw new AppError('Order not found', 404, 'ORDER_NOT_FOUND');
+          }
+          if (error?.message === 'ORDER_NOT_CANCELLABLE') {
+            throw new AppError('Order cannot be cancelled', 400, 'ORDER_NOT_CANCELLABLE');
+          }
+          throw error;
+        }
       }, {
         params: t.Object({
           id: t.String(),

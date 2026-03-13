@@ -303,7 +303,7 @@ export const Orders = () => {
                                   </span>
                                 </td>
                                 <td className="py-4 text-text-light">${toNumber(order.price).toFixed(2)}</td>
-                                <td className="py-4 text-right text-text-light">{qty.toLocaleString()}</td>
+                                <td className="py-4 text-right text-text-light">{qty.toFixed(2)}</td>
                                 <td className="py-4 px-8">
                                   <div className="flex items-center gap-3">
                                     <div className="flex-1 h-1.5 bg-card-dark rounded-full overflow-hidden">
