@@ -5,6 +5,8 @@ import { motion } from "motion/react";
 import { API_BASE_URL } from "../lib/api";
 import { persistSessionUser } from "../lib/session";
 
+const ADMIN_ROLES = new Set(["ADMIN", "SUPERADMIN"]);
+
 export const Login = () => {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const navigate = useNavigate();
@@ -34,13 +36,44 @@ export const Login = () => {
 
   useEffect(() => {
     const token = localStorage.getItem("token");
-    const role = localStorage.getItem("userRole");
-
-    if (!token || !role) {
+    if (!token) {
       return;
     }
 
-    navigate(role === "ADMIN" || role === "SUPERADMIN" ? "/admin" : "/dashboard");
+    const syncExistingSession = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/auth/me`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data?.success) {
+          return;
+        }
+
+        const role = data.data.role;
+
+        persistSessionUser({
+          userId: data.data.userId,
+          username: data.data.username,
+          email: data.data.email,
+          role,
+          depositeMemo: data.data.depositeMemo,
+        });
+
+        navigate(ADMIN_ROLES.has(role) ? "/admin" : "/dashboard");
+      } catch {
+        const role = localStorage.getItem("userRole");
+        if (role) {
+          navigate(ADMIN_ROLES.has(role) ? "/admin" : "/dashboard");
+        }
+      }
+    };
+
+    syncExistingSession();
   }, [navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -78,7 +111,7 @@ export const Login = () => {
         depositeMemo: data.data.depositeMemo,
       });
 
-      navigate(role === "ADMIN" || role === "SUPERADMIN" ? "/admin" : "/dashboard");
+      navigate(ADMIN_ROLES.has(role) ? "/admin" : "/dashboard");
     } catch (err: any) {
       setError(err.message || "Unable to login");
     } finally {

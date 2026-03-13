@@ -29,12 +29,16 @@ export default function LoginPage() {
         throw new Error(data.error || 'Login failed');
       }
 
-      // ✅ Store JWT
       localStorage.setItem('token', data.data.token);
+      localStorage.setItem('userId', data.data.userId);
+      localStorage.setItem('username', data.data.username);
+      localStorage.setItem('email', data.data.email);
+      localStorage.setItem('userRole', data.data.role);
+      localStorage.setItem('depositeMemo', data.data.depositeMemo);
 
       alert('Login successful');
 
-      router.push('/'); // redirect to home
+      router.push('/');
     } catch (err: any) {
       alert(err.message);
     } finally {

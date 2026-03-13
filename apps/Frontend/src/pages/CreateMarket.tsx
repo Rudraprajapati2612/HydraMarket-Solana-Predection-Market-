@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import { Sidebar } from "../components/Sidebar";
+import { API_BASE_URL } from "../lib/api";
 
 export const CreateMarket = () => {
   const navigate = useNavigate();
@@ -99,22 +100,44 @@ export const CreateMarket = () => {
   };
 
   const handleCreateMarket = async () => {
-    if (!question || !expiresAt) return;
+    if (!question.trim() || !description.trim() || !expiresAt || !resolutionSource.trim()) {
+      setSubmitState("error");
+      setErrorMessage("Please fill all required fields before creating the market");
+      toast.error("Missing required fields");
+      return;
+    }
 
     setSubmitState("loading");
     setErrorMessage("");
 
     try {
-      // Mock API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // In a real app:
-      // const response = await fetch('/api/markets', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ question, description, category, expiresAt, resolutionSource })
-      // });
-      // if (!response.ok) throw new Error('Failed to create market');
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        navigate("/login");
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/markets`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          question: question.trim(),
+          description: description.trim(),
+          category,
+          expiresAt,
+          resolutionSource: resolutionSource.trim(),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.message || data?.error || "Failed to create market");
+      }
 
       setSubmitState("success");
       toast.success("Market created successfully");

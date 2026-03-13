@@ -126,12 +126,26 @@ export class AuthServices {
       role: user.role, // ✅ Include role
     });
 
+    const cachedUser = {
+      userId: user.id,
+      email: user.email,
+      username: user.username,
+      fullName: user.fullName,
+      role: user.role,
+      depositeAddress: HOT_WALLET_ADDRESS,
+      depositeMemo: user.depositeMemo,
+      createdAt: user.createdAt.toISOString(),
+    };
+
     await this.cacheSession(token, {
       userId: user.id,
       email: user.email,
       username: user.username,
       role: user.role, // ✅ Cache role
     });
+
+    // Keep /auth/me aligned with the current DB role after login.
+    await redis.setex(`user:${user.id}`, 3600, JSON.stringify(cachedUser));
 
     console.log(`✅ User logged in: ${user.username} [${user.role}]`);
 
@@ -286,6 +300,21 @@ export class AuthServices {
       where: { id: targetUserId },
       data: { role: 'ADMIN' },
     });
+
+    await redis.setex(
+      `user:${updatedUser.id}`,
+      3600,
+      JSON.stringify({
+        userId: updatedUser.id,
+        email: updatedUser.email,
+        username: updatedUser.username,
+        fullName: updatedUser.fullName,
+        role: updatedUser.role,
+        depositeAddress: HOT_WALLET_ADDRESS,
+        depositeMemo: updatedUser.depositeMemo,
+        createdAt: updatedUser.createdAt.toISOString(),
+      })
+    );
 
     console.log(`✅ User ${updatedUser.username} promoted to ADMIN`);
 

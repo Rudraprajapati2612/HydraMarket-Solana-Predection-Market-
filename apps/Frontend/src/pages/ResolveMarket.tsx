@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import { Sidebar } from "../components/Sidebar";
+import { API_BASE_URL } from "../lib/api";
 
 interface Market {
   id: string;
@@ -15,6 +16,11 @@ interface Market {
   state: string;
   outcome?: string;
   resolvedAt?: string;
+}
+
+interface MarketStats {
+  totalVolume?: number;
+  participants?: number;
 }
 
 export const ResolveMarket = () => {
@@ -61,54 +67,55 @@ export const ResolveMarket = () => {
     setLoading(true);
     setError(null);
     try {
-      // Mock API call: GET /markets?state=OPEN
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const mockMarkets: Market[] = [
-        {
-          id: "#MKT-8809",
-          question: "Will BTC reach $100k by March 2026?",
-          description: "Resolves YES if BTC/USD >= 100,000 at expiry according to Pyth oracle",
-          category: "Crypto",
-          expiresAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), // 2 hours ago
-          volume: 12543,
-          traders: 847,
-          resolutionSource: "Pyth BTC/USD oracle",
-          state: "OPEN"
-        },
-        {
-          id: "#MKT-9122",
-          question: "Will India beat New Zealand in the 3rd Test?",
-          description: "Resolves YES if India wins the match. NO if NZ wins or Draw.",
-          category: "Sports",
-          expiresAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), // 1 day ago
-          volume: 45200,
-          traders: 3120,
-          resolutionSource: "Official ICC Match Report",
-          state: "OPEN"
-        },
-        {
-          id: "#MKT-7741",
-          question: "Will the Fed cut interest rates in March 2026?",
-          description: "Resolves YES if the Federal Reserve announces a rate cut of at least 25bps.",
-          category: "Finance",
-          expiresAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(), // 5 hours ago
-          volume: 89000,
-          traders: 1240,
-          resolutionSource: "Federal Reserve Official Website",
-          state: "OPEN"
-        }
-      ];
+      const response = await fetch(`${API_BASE_URL}/markets?state=OPEN`);
+      const data = await response.json();
 
-      // Filter for expired markets
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.message || data?.error || "Failed to fetch markets");
+      }
+
       const now = new Date();
-      const expired = mockMarkets.filter(m => new Date(m.expiresAt) < now);
-      
-      setMarkets(expired);
+      const expiredMarkets = (data.data || []).filter((market: any) => {
+        if (!market?.expiresAt) return false;
+        return new Date(market.expiresAt) < now;
+      });
+
+      const enrichedMarkets: Market[] = await Promise.all(
+        expiredMarkets.map(async (market: any) => {
+          let stats: MarketStats = {};
+
+          try {
+            const statsResponse = await fetch(`${API_BASE_URL}/markets/${market.id}/stats`);
+            const statsData = await statsResponse.json();
+
+            if (statsResponse.ok && statsData?.success) {
+              stats = statsData.data || {};
+            }
+          } catch {
+            stats = {};
+          }
+
+          return {
+            id: market.id,
+            question: market.question,
+            description: market.description,
+            category: market.category,
+            expiresAt: market.expiresAt,
+            volume: Number(stats.totalVolume || 0),
+            traders: Number(stats.participants || 0),
+            resolutionSource: market.resolutionSource || "Not specified",
+            state: market.state,
+            outcome: market.outcome || undefined,
+            resolvedAt: market.resolvedAt || undefined,
+          };
+        })
+      );
+
+      setMarkets(enrichedMarkets);
       
       // Initialize selections
-      const initialSelections: any = {};
-      expired.forEach(m => {
+      const initialSelections: Record<string, { outcome: "YES" | "NO" | "INVALID" | null; reason: string }> = {};
+      enrichedMarkets.forEach((m) => {
         initialSelections[m.id] = { outcome: null, reason: "" };
       });
       setSelections(initialSelections);
@@ -142,8 +149,29 @@ export const ResolveMarket = () => {
     setSubmitErrors(prev => ({ ...prev, [marketId]: "" }));
 
     try {
-      // Mock API call: POST /payouts/resolve/{marketId}
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        navigate("/login");
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/payouts/resolve/${marketId}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          outcome: selection.outcome,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.message || data?.error || "Failed to resolve market");
+      }
       
       // Success
       setSubmitStates(prev => ({ ...prev, [marketId]: "success" }));
