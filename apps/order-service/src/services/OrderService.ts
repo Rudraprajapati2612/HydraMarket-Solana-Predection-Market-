@@ -368,9 +368,20 @@ export class OrderService {
 }
 
 async getOrderbook(marketId: string, outcome: 'YES' | 'NO') {
-    return await matchingEngine.getOrderbook({
+    try {
+      return await matchingEngine.getOrderbook({
         market_id: marketId,
         outcome,
-    });
+      });
+    } catch (error: any) {
+      if (error?.code === 5) {
+        return {
+          bids: [],
+          asks: [],
+        };
+      }
+
+      throw error;
+    }
 }
 }

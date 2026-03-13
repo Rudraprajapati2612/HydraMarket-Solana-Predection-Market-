@@ -55,10 +55,104 @@ export const marketRoutes = new Elysia({prefix:'/markets'})
           limit: query.limit,
           offset: query.offset,
         });
+
+        const marketIds = markets.map((market) => market.id);
+        const [participants, filledVolume, openOrders] = await Promise.all([
+          prisma.position.groupBy({
+            by: ["marketId"],
+            where: { marketId: { in: marketIds } },
+            _count: { marketId: true },
+          }),
+          prisma.order.groupBy({
+            by: ["marketId"],
+            where: {
+              marketId: { in: marketIds },
+              status: { in: ["FILLED", "PARTIAL", "MATCHED"] },
+            },
+            _sum: { amount: true },
+          }),
+          prisma.order.groupBy({
+            by: ["marketId", "outcome", "side"],
+            where: {
+              marketId: { in: marketIds },
+              status: "OPEN",
+            },
+            _max: { price: true },
+            _min: { price: true },
+            _sum: { amount: true },
+          }),
+        ]);
+
+        const participantMap = new Map(
+          participants.map((entry) => [entry.marketId, entry._count.marketId])
+        );
+        const volumeMap = new Map(
+          filledVolume.map((entry) => [entry.marketId, Number(entry._sum.amount ?? 0)])
+        );
+        const orderSummaryMap = new Map<string, {
+          yesBestBid: number | null;
+          yesBestAsk: number | null;
+          noBestBid: number | null;
+          noBestAsk: number | null;
+          liquidity: number;
+        }>();
+
+        for (const entry of openOrders) {
+          const current = orderSummaryMap.get(entry.marketId) ?? {
+            yesBestBid: null,
+            yesBestAsk: null,
+            noBestBid: null,
+            noBestAsk: null,
+            liquidity: 0,
+          };
+
+          current.liquidity += Number(entry._sum.amount ?? 0);
+
+          const isYes = entry.outcome === "YES";
+          const isBuy = entry.side === "BUY";
+
+          if (isYes && isBuy) current.yesBestBid = Number(entry._max.price ?? 0);
+          if (isYes && !isBuy) current.yesBestAsk = Number(entry._min.price ?? 0);
+          if (!isYes && isBuy) current.noBestBid = Number(entry._max.price ?? 0);
+          if (!isYes && !isBuy) current.noBestAsk = Number(entry._min.price ?? 0);
+
+          orderSummaryMap.set(entry.marketId, current);
+        }
+
+        const enrichedMarkets = markets.map((market) => {
+          const orderSummary = orderSummaryMap.get(market.id);
+          const mid = (bid: number | null, ask: number | null) =>
+            bid !== null && ask !== null ? (bid + ask) / 2
+            : bid !== null ? bid
+            : ask !== null ? ask
+            : null;
+          const yesMid = mid(orderSummary?.yesBestBid ?? null, orderSummary?.yesBestAsk ?? null);
+
+          return {
+            ...market,
+            stats: {
+              participants: participantMap.get(market.id) ?? 0,
+              totalVolume: volumeMap.get(market.id) ?? 0,
+              liquidity: orderSummary?.liquidity ?? 0,
+            },
+            price: {
+              yes: {
+                bestBid: orderSummary?.yesBestBid ?? null,
+                bestAsk: orderSummary?.yesBestAsk ?? null,
+                midPrice: yesMid,
+              },
+              no: {
+                bestBid: orderSummary?.noBestBid ?? null,
+                bestAsk: orderSummary?.noBestAsk ?? null,
+              },
+              impliedProbabilityYes: yesMid !== null ? Math.round(yesMid * 100) : null,
+            },
+          };
+        });
         
         return {
           success: true,
-          data: markets,
+          data: enrichedMarkets,
         };
       }, {
         query: t.Object({
@@ -209,6 +303,8 @@ export const marketRoutes = new Elysia({prefix:'/markets'})
             marketOutcome:  outcome,
             yesTokens:      yes,
             noTokens:       no,
+            avgYesPrice:    position.avgYesPrice ? Number(position.avgYesPrice) : null,
+            avgNoPrice:     position.avgNoPrice ? Number(position.avgNoPrice) : null,
             isClaimed:      position.isClaimed,
             claimedAt:      position.claimedAt,
             claimTxHash:    position.claimTxHash,

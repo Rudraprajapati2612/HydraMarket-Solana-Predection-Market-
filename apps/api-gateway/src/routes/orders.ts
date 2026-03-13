@@ -59,6 +59,57 @@ export const orderRoutes = new Elysia({prefix:'/orders'})
           marketId: t.Optional(t.String()),
         }),
       })
+
+      .get('/trades', async ({ user, query }) => {
+        if (!user) {
+          throw new AppError('Unauthorized', 401, 'UNAUTHORIZED');
+        }
+
+        const limit = Math.min(Number((query as any).limit ?? 50), 200);
+        const marketId = (query as any).marketId;
+
+        const trades = await prisma.trade.findMany({
+          where: {
+            ...(marketId ? { marketId } : {}),
+            OR: [
+              { buyerId: user.userId },
+              { sellerId: user.userId },
+            ],
+          },
+          orderBy: { createdAt: 'desc' },
+          take: limit,
+        });
+
+        const marketIds = Array.from(new Set(trades.map((trade) => trade.marketId)));
+        const markets = marketIds.length > 0
+          ? await prisma.market.findMany({
+              where: { id: { in: marketIds } },
+              select: { id: true, question: true },
+            })
+          : [];
+        const marketMap = new Map(markets.map((market) => [market.id, market.question]));
+
+        return {
+          success: true,
+          data: trades.map((trade) => ({
+            id: trade.id,
+            marketId: trade.marketId,
+            marketQuestion: marketMap.get(trade.marketId) ?? 'Unknown market',
+            outcome: trade.outcome,
+            role: trade.buyerId === user.userId ? 'BUY' : 'SELL',
+            quantity: Number(trade.quantity),
+            price: Number(trade.price),
+            total: Number(trade.quantity) * Number(trade.price),
+            tradeType: trade.tradeType,
+            timestamp: trade.createdAt,
+          })),
+        };
+      }, {
+        query: t.Object({
+          marketId: t.Optional(t.String()),
+          limit: t.Optional(t.Number({ minimum: 1, maximum: 200 })),
+        }),
+      })
       
       /**
        * GET /orders/orderbook/:marketId/:outcome - Get orderbook

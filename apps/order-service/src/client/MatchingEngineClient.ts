@@ -113,7 +113,9 @@ export interface GetOrderbookRequest {
         return new Promise((resolve, reject) => {
           this.client.GetOrderbook(request, (error: any, response: GetOrderbookResponse) => {
             if (error) {
-              console.error('MatchingEngine.GetOrderbook error:', error);
+              if (error.code !== grpc.status.NOT_FOUND) {
+                console.error('MatchingEngine.GetOrderbook error:', error);
+              }
               reject(error);
             } else {
               resolve(response);

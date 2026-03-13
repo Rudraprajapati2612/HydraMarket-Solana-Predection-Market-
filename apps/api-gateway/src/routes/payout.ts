@@ -46,13 +46,20 @@ const ESCROW_VAULT_SEED          = Buffer.from('escrow_vault');
 // Helpers
 // ─────────────────────────────────────────────────────────────
 
-function buildProvider(secretKeyBs58?: string) {
+function buildProviderFromSecret(secretKeyBs58: string) {
   const connection = new Connection(SOLANA_RPC_URL, 'confirmed');
-  const key = secretKeyBs58 ?? requireEnv('HOT_WALLET_PRIVATE_KEY');
-  const keypair    = Keypair.fromSecretKey(bs58.decode(key));
+  const keypair    = Keypair.fromSecretKey(bs58.decode(secretKeyBs58));
   const wallet     = new anchor.Wallet(keypair);
   const provider   = new anchor.AnchorProvider(connection, wallet, { commitment: 'confirmed' });
   return { provider, keypair };
+}
+
+function buildAdminProvider() {
+  return buildProviderFromSecret(requireEnv('ADMIN_PRIVATE_KEY'));
+}
+
+function buildHotWalletProvider() {
+  return buildProviderFromSecret(requireEnv('HOT_WALLET_PRIVATE_KEY'));
 }
 
 function deriveVaultPda(marketPubkey: PublicKey): PublicKey {
@@ -70,6 +77,66 @@ function parseOutcomeEnum(outcome: string) {
     case 'INVALID': return { invalid: {} };
     default: throw new Error(`Unknown outcome: ${outcome}`);
   }
+}
+
+function getPositionPayout(
+  outcome: string,
+  yesTokens: number,
+  noTokens: number,
+) {
+  if (outcome === 'YES') return yesTokens;
+  if (outcome === 'NO') return noTokens;
+  if (outcome === 'INVALID') return yesTokens + noTokens;
+  return 0;
+}
+
+async function creditWinningPositionsForMarket(
+  marketId: string,
+  outcome: string,
+  txSignature: string,
+) {
+  const positions = await prisma.position.findMany({
+    where: { marketId, isClaimed: false },
+    select: {
+      id: true,
+      userId: true,
+      yesTokens: true,
+      noTokens: true,
+    },
+  });
+
+  const winners = positions
+    .map((position) => {
+      const yesTokens = Number(position.yesTokens);
+      const noTokens = Number(position.noTokens);
+      const payout = getPositionPayout(outcome, yesTokens, noTokens);
+      return { ...position, payout };
+    })
+    .filter((position) => position.payout > 0);
+
+  if (winners.length === 0) {
+    return { creditedUsers: 0, totalPayout: 0 };
+  }
+
+  await prisma.$transaction([
+    ...winners.map((winner) =>
+      prisma.ledger.update({
+        where: { userId_asset: { userId: winner.userId, asset: 'USDC' } },
+        data: { available: { increment: winner.payout } },
+      }),
+    ),
+    ...winners.map((winner) =>
+      prisma.position.update({
+        where: { id: winner.id },
+        data: { isClaimed: true, claimedAt: new Date(), claimTxHash: txSignature },
+      }),
+    ),
+  ]);
+
+  return {
+    creditedUsers: winners.length,
+    totalPayout: winners.reduce((sum, winner) => sum + winner.payout, 0),
+  };
 }
 
 async function executeClaimPayout(userId: string, marketId: string) {
@@ -90,17 +157,49 @@ async function executeClaimPayout(userId: string, marketId: string) {
 
   const yesTokens = Number(position.yesTokens);
   const noTokens = Number(position.noTokens);
-
-  let expectedPayout = 0;
-  if (market.outcome === 'YES') expectedPayout = yesTokens;
-  else if (market.outcome === 'NO') expectedPayout = noTokens;
-  else if (market.outcome === 'INVALID') expectedPayout = yesTokens + noTokens;
+  const expectedPayout = getPositionPayout(market.outcome, yesTokens, noTokens);
 
   if (expectedPayout === 0) {
     return { success: false, error: 'No winning tokens to claim' } as const;
   }
 
-  const { provider } = buildProvider();
+  const marketPositions = await prisma.position.findMany({
+    where: { marketId },
+    select: {
+      userId: true,
+      isClaimed: true,
+      claimTxHash: true,
+      yesTokens: true,
+      noTokens: true,
+    },
+  });
+
+  const claimedWinner = marketPositions.find((marketPosition) => {
+    const payout = getPositionPayout(
+      market.outcome!,
+      Number(marketPosition.yesTokens),
+      Number(marketPosition.noTokens),
+    );
+    return payout > 0 && marketPosition.isClaimed && !!marketPosition.claimTxHash;
+  });
+
+  if (claimedWinner?.claimTxHash) {
+    await creditWinningPositionsForMarket(marketId, market.outcome, claimedWinner.claimTxHash);
+
+    return {
+      success: true,
+      data: {
+        marketId,
+        payout: expectedPayout,
+        outcome: market.outcome,
+        yesTokens,
+        noTokens,
+        txSignature: claimedWinner.claimTxHash,
+      },
+    } as const;
+  }
+
+  const { provider } = buildHotWalletProvider();
   const hotWalletPubkey = provider.wallet.publicKey;
 
   const escrowProgram = new anchor.Program<EscrowVault>(
@@ -167,21 +266,40 @@ async function executeClaimPayout(userId: string, marketId: string) {
     const errorMsg = anchorError
       ? `${anchorError.error.errorCode.code}: ${anchorError.error.errorMessage}`
       : (e.message ?? 'Unknown error');
+
+    if (errorMsg.includes('NoTokensToClaim')) {
+      const claimedAfterFailure = await prisma.position.findFirst({
+        where: {
+          marketId,
+          isClaimed: true,
+          claimTxHash: { not: null },
+        },
+        select: { claimTxHash: true },
+      });
+
+      if (claimedAfterFailure?.claimTxHash) {
+        await creditWinningPositionsForMarket(marketId, market.outcome, claimedAfterFailure.claimTxHash);
+
+        return {
+          success: true,
+          data: {
+            marketId,
+            payout: expectedPayout,
+            outcome: market.outcome,
+            yesTokens,
+            noTokens,
+            txSignature: claimedAfterFailure.claimTxHash,
+          },
+        } as const;
+      }
+    }
+
     console.error('❌ claimPayout failed:', errorMsg);
     return { success: false, error: `Solana claimPayout failed: ${errorMsg}` } as const;
   }
 
   try {
-    await prisma.$transaction([
-      prisma.ledger.update({
-        where: { userId_asset: { userId, asset: 'USDC' } },
-        data: { available: { increment: expectedPayout } },
-      }),
-      prisma.position.update({
-        where: { userId_marketId: { userId, marketId } },
-        data: { isClaimed: true, claimedAt: new Date(), claimTxHash: txSignature },
-      }),
-    ]);
+    await creditWinningPositionsForMarket(marketId, market.outcome, txSignature);
   } catch (dbError) {
     await prisma.reconciliationLog.create({
       data: {
@@ -243,8 +361,8 @@ export const payoutRoutes = new Elysia({ prefix: '/payouts' })
       const vaultPda     = deriveVaultPda(marketPubkey);
       const outcomeEnum  = parseOutcomeEnum(outcome);
 
-      const { provider: adminProvider, keypair: adminKeypair }     = buildProvider();
-      const { keypair: resolutionAdapterKeypair }                   = buildProvider(market.resolutionAdapterKey);
+      const { provider: adminProvider, keypair: adminKeypair }     = buildAdminProvider();
+      const { keypair: resolutionAdapterKeypair }                   = buildProviderFromSecret(market.resolutionAdapterKey);
 
       const marketProgram = new anchor.Program<MarketRegistry>(MARKET_IDL as MarketRegistry, adminProvider);
       const escrowProgram = new anchor.Program<EscrowVault>(ESCROW_IDL as EscrowVault, adminProvider);
